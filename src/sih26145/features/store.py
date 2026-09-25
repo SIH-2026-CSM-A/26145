@@ -132,9 +132,12 @@ class FeatureStore:
         for i in range(steps):
             closing = (host.egress_bid + i) % cfg.egress_buckets
             x = host.egress[closing]
-            diff = x - host.mean
-            host.mean += a * diff
-            host.var = (1 - a) * (host.var + a * diff * diff)
+            if host.baseline_n == 0:
+                host.mean, host.var = x, 0.0  # seed from the first closed minute
+            else:
+                diff = x - host.mean
+                host.mean += a * diff
+                host.var = (1 - a) * (host.var + a * diff * diff)
             host.baseline_n += 1
             host.egress[(closing + 1) % cfg.egress_buckets] = 0.0
         if bid - host.egress_bid > cfg.egress_buckets:
@@ -242,7 +245,9 @@ def _egress_z(s: FeatureStore, ip: str) -> Optional[float]:
     if h is None or h.baseline_n < s.cfg.min_baseline_buckets:
         return None
     current = h.egress[h.egress_bid % s.cfg.egress_buckets]
-    return float((current - h.mean) / max(math.sqrt(h.var), 1.0))  # ponytail: 1-byte std floor
+    # ponytail: std floored at 10% of the mean (and 1 byte) so a perfectly steady baseline
+    # does not turn a small wobble into a huge z; tune if hosts are bursty by nature.
+    return float((current - h.mean) / max(math.sqrt(h.var), 0.1 * h.mean, 1.0))
 
 
 def _dc(i):

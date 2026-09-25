@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Any, Tuple
 
 # Version of the rule set as a whole; reported as alert model_version "rules-<version>".
-RULESET_VERSION = "1.0.0"
+RULESET_VERSION = "1.1.0"  # 1.1.0: detector (f) direction-aware
 
 
 @dataclass(frozen=True)

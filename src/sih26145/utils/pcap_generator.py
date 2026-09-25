@@ -118,20 +118,59 @@ def generate_threat_pcap(output_file: str) -> int:
         pkt_sweep = create_ethernet_ip_packet("192.168.1.52", "10.0.0.200", 40000, port, "TCP", tcp_flags=dpkt.tcp.TH_SYN)
         packets.append((ts + 20.0 + (port - 100) * 0.01, pkt_sweep))
 
-    # 7. Category 6: THREAT_EXFILTRATION (Large ICMP Echo payload over 1.2s duration: total_bytes=1536, small_pkt_ratio=0.0)
-    icmp_payload = b"X" * 256
-    pkt_icmp = create_ethernet_ip_packet("192.168.1.51", "10.0.0.99", 0, 0, "ICMP", icmp_payload)
-    for i in range(6):
-        packets.append((ts + 21.0 + i * 0.24, pkt_icmp))
+    # 7. Category 6: THREAT_EXFILTRATION — internal host uploads ~1.2 MB to an external
+    # (TEST-NET-3) address; the capture holds both halves, so the server's small ACKs are
+    # present and the outbound/inbound ratio is measurable.
+    packets += _upload(ts + 21.0, "192.168.1.51", "203.0.113.99", 51515, 800, bidirectional=True)
 
-    # Sort packets by timestamp before writing
+    return _write(output_file, packets)
+
+
+def _write(output_file: str, packets: List[Tuple[float, bytes]]) -> int:
     packets.sort(key=lambda x: x[0])
-
-    # Write to PCAP file using dpkt
     with open(output_file, "wb") as f:
         writer = dpkt.pcap.Writer(f)
         for p_ts, p_buf in packets:
             writer.writepkt(p_buf, p_ts)
-
     return len(packets)
 
+
+def _upload(t0: float, client: str, server: str, sport: int, segments: int,
+            bidirectional: bool, seg_size: int = 1460, spacing: float = 0.0025) -> List[Tuple[float, bytes]]:
+    """Client -> server bulk upload over TCP/443; with bidirectional, the server ACKs every 10 segments."""
+    out = []
+    for i in range(segments):
+        out.append((t0 + i * spacing, create_ethernet_ip_packet(
+            client, server, sport, 443, "TCP", b"U" * seg_size, tcp_flags=dpkt.tcp.TH_PUSH | dpkt.tcp.TH_ACK)))
+        if bidirectional and i % 10 == 9:
+            out.append((t0 + i * spacing + 0.0005, create_ethernet_ip_packet(
+                server, client, 443, sport, "TCP", tcp_flags=dpkt.tcp.TH_ACK)))
+    return out
+
+
+def _small_https(t0: float, client: str, server: str, sport: int, bidirectional: bool) -> List[Tuple[float, bytes]]:
+    """A routine HTTPS exchange: ~1.8 KB up; with bidirectional, ~2.9 KB down."""
+    out = [(t0 + i * 0.01, create_ethernet_ip_packet(client, server, sport, 443, "TCP", b"R" * 600,
+                                                     tcp_flags=dpkt.tcp.TH_PUSH | dpkt.tcp.TH_ACK)) for i in range(3)]
+    if bidirectional:
+        out += [(t0 + 0.05 + i * 0.01, create_ethernet_ip_packet(server, client, 443, sport, "TCP", b"S" * 1400,
+                                                                 tcp_flags=dpkt.tcp.TH_PUSH | dpkt.tcp.TH_ACK)) for i in range(2)]
+    return out
+
+
+def generate_exfil_pcap(output_file: str, bidirectional: bool, start: float = 1_790_000_000.0) -> int:
+    """Exfiltration scenario for detector (f), captured with both halves or with one.
+
+    192.168.1.60 makes one routine HTTPS exchange per minute with a popular external
+    service (also used by three other hosts) for seven minutes, building its egress
+    baseline; in minute eight it uploads ~1 MB to an external address no one else uses.
+    """
+    host, popular, rare = "192.168.1.60", "203.0.113.10", "198.51.100.77"
+    packets: List[Tuple[float, bytes]] = []
+    for minute in range(7):
+        t = start + minute * 60 + 5
+        packets += _small_https(t, host, popular, 50000 + minute, bidirectional)
+        for peer in range(3):
+            packets += _small_https(t + 1 + peer, f"192.168.1.{61 + peer}", popular, 50100 + minute * 10 + peer, bidirectional)
+    packets += _upload(start + 7 * 60 + 5, host, rare, 51000, 700, bidirectional)
+    return _write(output_file, packets)

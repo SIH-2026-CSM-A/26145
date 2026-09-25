@@ -96,13 +96,30 @@ def test_recon_portscan_detector_hit():
     assert hit.rule_id == "RULE_RECON_SYN_SWEEP"
 
 
+def _exfil_ctx(flow, store=None):
+    from sih26145.detectors.context import DetectionContext
+    from sih26145.features.directional import NetworkPolicy
+    from sih26145.features.store import FeatureStore
+    store = store or FeatureStore()
+    store.update(flow)
+    return DetectionContext(flow, store, NetworkPolicy())
+
+
 def test_exfiltration_detector_hit():
+    """Both halves captured: detector (f) uses the outbound/inbound byte ratio.
+
+    Rewritten for the direction-aware detector: exfiltration needs internal->external bytes
+    under the CIDR policy, so it is evaluated with a DetectionContext, not a bare vector.
+    """
+    from sih26145.flow.models import FlowKey, FlowRecord
+    flow = FlowRecord(FlowKey("192.168.1.51", "203.0.113.99", 443, "TCP", 51515), 100.0, 110.0,
+                      fwd_packets=800, fwd_bytes=2_000_000, rev_packets=80, rev_bytes=20_000)
     suite = RuleDetectorSuite()
-    fv = make_fv(bps=800000.0, duration=10.0, small_pkt_ratio=0.05)
-    hits = suite.evaluate(fv)
-    assert len(hits) >= 1
+    hits = suite.evaluate(make_fv(bps=800000.0, duration=10.0, small_pkt_ratio=0.05), _exfil_ctx(flow))
     hit = next(h for h in hits if h.threat_class == "THREAT_EXFILTRATION")
-    assert hit.rule_id == "RULE_EXFIL_HIGH_BYTE_STREAM"
+    assert hit.rule_id == "RULE_EXFIL_OUTBOUND_RATIO"
+    assert hit.evidence["outbound_inbound_byte_ratio"]["value"] == 100.0
+    assert hit.substitutions == ()
 
 
 def test_encrypted_anomaly_detector_hit():
@@ -115,12 +132,23 @@ def test_encrypted_anomaly_detector_hit():
 
 
 def test_icmp_exfiltration_detector_hit():
+    """One half captured (ICMP echo requests leaving, no replies): detector (f) cannot use
+    the ratio and substitutes the host's egress baseline + destination rarity."""
+    from sih26145.features.store import FeatureStore
+    from sih26145.flow.models import FlowKey, FlowRecord
+    store = FeatureStore()
+    for minute in range(6):  # routine pings to a popular host build the egress baseline
+        t = 1000.0 + minute * 60
+        store.update(FlowRecord(FlowKey("192.168.1.51", "203.0.113.1", 0, "ICMP", 0), t, t + 1,
+                                fwd_packets=4, fwd_bytes=392))
+    tunnel = FlowRecord(FlowKey("192.168.1.51", "198.51.100.99", 0, "ICMP", 0), 1400.0, 1430.0,
+                        fwd_packets=900, fwd_bytes=900_000, icmp_type=8)
     suite = RuleDetectorSuite()
-    fv = make_fv(is_tcp=0.0, is_icmp=1.0, total_bytes=1024, duration=2.0, small_pkt_ratio=0.0)
-    hits = suite.evaluate(fv)
-    assert len(hits) >= 1
+    fv = make_fv(is_tcp=0.0, is_icmp=1.0, total_bytes=900_000, duration=30.0, small_pkt_ratio=0.0)
+    hits = suite.evaluate(fv, _exfil_ctx(tunnel, store))
     hit = next(h for h in hits if h.threat_class == "THREAT_EXFILTRATION")
-    assert hit.rule_id == "RULE_EXFIL_HIGH_BYTE_STREAM"
+    assert hit.rule_id == "RULE_EXFIL_EGRESS_BASELINE"
+    assert hit.substitutions[0]["unavailable_on_this_flow"] == "outbound_inbound_byte_ratio"
 
 
 def test_detector_threshold_boundaries():

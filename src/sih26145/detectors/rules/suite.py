@@ -28,11 +28,11 @@ class RuleDetectorSuite:
             ExfiltrationDetector(),
         ]
 
-    def evaluate(self, fv: FeatureVector) -> List[RuleHit]:
-        """Run FeatureVector through all registered rule detectors and return active hits."""
+    def evaluate(self, fv: FeatureVector, ctx=None) -> List[RuleHit]:
+        """Run a flow through all registered rule detectors and return active hits."""
         hits: List[RuleHit] = []
         for det in self.detectors:
-            hit = det.detect(fv)
+            hit = det.detect(fv, ctx)
             if hit is not None:
                 hits.append(hit)
         return hits

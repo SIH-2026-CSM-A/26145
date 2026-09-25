@@ -10,6 +10,10 @@ from sih26145.models.suite import MLModelSuite
 from sih26145.alerts.aggregator import EvidenceAggregator
 from sih26145.storage.database import AlertStorage
 from sih26145.alerts.models import Alert
+from sih26145.detectors.context import DetectionContext
+from sih26145.features.directional import NetworkPolicy
+from sih26145.features.store import FeatureStore
+from sih26145.flow.models import FlowRecord
 
 
 class ThreatDetectionPipeline:
@@ -22,6 +26,8 @@ class ThreatDetectionPipeline:
         self.ml_suite = MLModelSuite()
         self.aggregator = EvidenceAggregator()
         self.storage = AlertStorage(db_path)
+        self.policy = NetworkPolicy.from_env()
+        self.feature_store = FeatureStore(policy=self.policy)
 
     async def init(self):
         """Initialize pipeline storage."""
@@ -38,45 +44,28 @@ class ThreatDetectionPipeline:
             if pkt is None:
                 continue
             last_pkt_time = pkt.timestamp
-            flushed_flows = self.flow_tracker.process_packet(pkt)
-            for flow in flushed_flows:
-                fv = self.feature_extractor.extract(flow)
-                rule_hits = self.rule_suite.evaluate(fv)
-                ml_preds = self.ml_suite.predict(fv)
-
-                final_alerts = self.aggregator.aggregate(
-                    flow=flow,
-                    fv=fv,
-                    rule_hits=rule_hits,
-                    ml_predictions=ml_preds,
-                )
-
-                for alert in final_alerts:
-                    await self.storage.save_alert(alert)
-                    if alert_queue is not None:
-                        await alert_queue.put(alert.to_dict())
-                    generated_alerts.append(alert)
+            for flow in self.flow_tracker.process_packet(pkt):
+                await self._score(flow, alert_queue, generated_alerts)
 
         # Flush all remaining active flows at the end of PCAP
         remaining_flows = self.flow_tracker.flush_expired(last_pkt_time + 100.0)
         for flow in list(self.flow_tracker._active_flows.values()):
             if flow not in remaining_flows:
                 remaining_flows.append(flow)
-
         for flow in remaining_flows:
-            fv = self.feature_extractor.extract(flow)
-            rule_hits = self.rule_suite.evaluate(fv)
-            ml_preds = self.ml_suite.predict(fv)
-            final_alerts = self.aggregator.aggregate(
-                flow=flow,
-                fv=fv,
-                rule_hits=rule_hits,
-                ml_predictions=ml_preds,
-            )
-            for alert in final_alerts:
-                await self.storage.save_alert(alert)
-                if alert_queue is not None:
-                    await alert_queue.put(alert.to_dict())
-                generated_alerts.append(alert)
+            await self._score(flow, alert_queue, generated_alerts)
 
         return generated_alerts
+
+    async def _score(self, flow: FlowRecord, alert_queue: Optional[asyncio.Queue], out: List[Alert]):
+        """Tier-2 update, then rules + ML on the flow, then persist and publish."""
+        self.feature_store.update(flow)
+        fv = self.feature_extractor.extract(flow)
+        ctx = DetectionContext(flow, self.feature_store, self.policy)
+        rule_hits = self.rule_suite.evaluate(fv, ctx)
+        ml_preds = self.ml_suite.predict(fv)
+        for alert in self.aggregator.aggregate(flow=flow, fv=fv, rule_hits=rule_hits, ml_predictions=ml_preds):
+            await self.storage.save_alert(alert)
+            if alert_queue is not None:
+                await alert_queue.put(alert.to_dict())
+            out.append(alert)

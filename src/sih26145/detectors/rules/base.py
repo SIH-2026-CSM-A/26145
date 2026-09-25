@@ -20,6 +20,11 @@ class BaseRuleDetector(ABC):
         pass
 
     @abstractmethod
-    def detect(self, fv: FeatureVector) -> Optional[RuleHit]:
-        """Evaluate FeatureVector and return RuleHit if threat signature matches."""
+    def detect(self, fv: FeatureVector, ctx=None) -> Optional[RuleHit]:
+        """Evaluate a flow and return a RuleHit if the threat signature matches.
+
+        `ctx` is a DetectionContext (flow, FeatureStore, NetworkPolicy) or None when only the
+        FeatureVector is available. Every feature read, through `fv` or `ctx`, must be
+        declared for this detector in feature_contract.toml.
+        """
         pass

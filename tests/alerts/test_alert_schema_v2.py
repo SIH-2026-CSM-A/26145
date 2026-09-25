@@ -7,6 +7,7 @@ import pytest
 from sih26145.alerts import Alert, EvidenceAggregator
 from sih26145.contract import load_contract
 from sih26145.detectors import RuleHit
+from sih26145.detectors.models import RULESET_VERSION
 from sih26145.features import FeatureExtractor
 from sih26145.flow import FlowTracker
 from sih26145.flow.community_id import community_id
@@ -53,7 +54,7 @@ def test_v2_alert_carries_every_field_derived_from_the_flow():
     assert d["timestamp"] == datetime.fromtimestamp(10.5, tz=timezone.utc).isoformat()
     assert d["observability_state"] == "bidirectional"
     assert d["contract_version"] == load_contract().version
-    assert d["model_version"] == "rules-1.0.0"
+    assert d["model_version"] == f"rules-{RULESET_VERSION}"
     assert d["evidence"] == [{"feature": "dns_query_count", "value": 7, "baseline": None, "baseline_source": None}]
     assert d["substitutions"] == []
     assert d["campaign_id"] is None and d["host_stage"] is None and d["record_hash"] is None

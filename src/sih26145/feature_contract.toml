@@ -141,8 +141,8 @@ reads = ["is_tcp", "small_pkt_ratio", "total_packets", "duration"]
 
 [consumers.exfiltration_detector]
 ps_class = "f"
-max_state = "computable"
-reads = ["bps", "is_icmp", "total_bytes", "duration", "small_pkt_ratio"]
+max_state = "reverse_dependent"
+reads = ["egress_bytes", "outbound_inbound_byte_ratio", "src_egress_bytes_z", "dst_distinct_srcs_longterm", "off_hours"]
 
 [consumers.ml_flow_models]
 ps_class = "all"
