@@ -5,7 +5,9 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-1.0.0-green.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18.3-blue.svg)](https://react.dev/)
 
-An explainable, read-only passive threat detection engine designed for unidirectional IP traffic feeds (e.g., optical data-diodes and passive network TAPs). The system provides multi-layer threat detection across 7 key threat categories using deterministic rule detectors and classical machine learning (Isolation Forest & Random Forest) without deep learning black-boxes or active mitigation calls.
+An explainable, read-only passive threat detection engine for traffic observed by an enclave that can never transmit (optical data diodes, passive taps). The capture may contain both halves of each conversation or only one; the system measures which, per flow, and declares for every feature what it needs (see `docs/ARCHITECTURE.md` §2 and §6). Detection uses deterministic rules and classical ML over flow metadata only, with no active mitigation and no payload decryption.
+
+> **Status:** see `docs/ARCHITECTURE.md` §15 and `docs/AUDIT.md`. The ML models are currently fitted on synthetic vectors, and no throughput figure has been measured yet.
 
 ---
 
@@ -18,15 +20,17 @@ The system operates strictly under **PASSIVE READ-ONLY MONITORING** semantics:
 
 ---
 
-## 🎯 Supported Threat Categories
+## 🎯 Threat Classes (mapped to PS 26145)
 
-1. **DNS Tunneling (`THREAT_DNS_TUNNEL`)**: High-entropy subdomains, unusual query length/depth.
-2. **DNS Exfiltration (`THREAT_EXFIL_DNS`)**: High-frequency oversized TXT/NULL queries.
-3. **ICMP Exfiltration (`THREAT_EXFIL_ICMP`)**: Abnormally large echo request payloads.
-4. **C2 Beaconing (`THREAT_BEACON_C2`)**: Periodic inter-arrival times & low jitter.
-5. **Slowloris DoS (`THREAT_SLOWLORIS_DOS`)**: Low BPS/PPS with open long-duration TCP sessions.
-6. **Port Sweep (`THREAT_PORT_SWEEP`)**: High unique destination port probing from a single source.
-7. **Anomalous Traffic Burst (`THREAT_ANOMALOUS_BURST`)**: Statistical PPS/BPS anomaly surges.
+| PS | Alert class | Detector |
+|---|---|---|
+| (a) Volumetric / protocol DDoS | `THREAT_DDOS_VOLUME` | `ddos_volume_detector` |
+| (b) C2 beaconing | `THREAT_C2_BEACON` | `c2_beacon_detector` |
+| (c) DGA and DNS tunnelling | `THREAT_DNS_DGA`, `THREAT_DNS_TUNNEL` | `dga_lexical_detector`, `dns_tunnel_detector` |
+| (d) Malware in encrypted sessions (TLS/QUIC metadata) | `THREAT_ENCRYPTED_ANOMALY` | `encrypted_anomaly_detector` |
+| (e) Recon and port scanning | `THREAT_RECON_PORTSCAN` | `recon_portscan_detector` |
+| (f) Data exfiltration | `THREAT_EXFILTRATION` | `exfiltration_detector` |
+| — unsupervised novelty | `THREAT_UNSUPERVISED_ANOMALY` | IsolationForest |
 
 ---
 
@@ -57,7 +61,7 @@ uv run python -m sih26145.cli analyze /path/to/traffic.pcap
 ```
 
 ### 2. Automated Synthetic Threat Demo
-Generate a test PCAP containing all 7 threat classes and run full pipeline analysis:
+Generate a synthetic test PCAP covering the threat classes above and run full pipeline analysis:
 ```bash
 uv run python -m sih26145.cli demo
 ```
