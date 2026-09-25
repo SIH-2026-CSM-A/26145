@@ -38,6 +38,8 @@ class PacketParser:
 
         dns_name: Optional[str] = None
         dns_qtype: Optional[int] = None
+        dns_is_response: Optional[bool] = None
+        dns_rcode: Optional[int] = None
 
         tls_ver: Optional[str] = None
         tls_sni: Optional[str] = None
@@ -108,7 +110,7 @@ class PacketParser:
                     
                     # Extract DNS Query if present
                     if dst_port == 53 or src_port == 53:
-                        dns_name, dns_qtype = self._parse_dns_query(l4_obj.data)
+                        dns_name, dns_qtype, dns_is_response, dns_rcode = self._parse_dns_query(l4_obj.data)
                 except Exception:
                     pass
 
@@ -148,6 +150,8 @@ class PacketParser:
             icmp_code=icmp_code,
             dns_query_name=dns_name,
             dns_query_type=dns_qtype,
+            dns_is_response=dns_is_response,
+            dns_rcode=dns_rcode,
             tls_version=tls_ver,
             tls_sni=tls_sni,
             tls_cipher_suites=tls_ciphers,
@@ -194,18 +198,21 @@ class PacketParser:
 
         return None, None
 
-    def _parse_dns_query(self, payload: bytes) -> Tuple[Optional[str], Optional[int]]:
-        """Safely parse unencrypted DNS query payload."""
+    def _parse_dns_query(self, payload: bytes) -> Tuple[Optional[str], Optional[int], Optional[bool], Optional[int]]:
+        """Safely parse unencrypted DNS header + question: (qname, qtype, is_response, rcode)."""
         if not payload:
-            return None, None
+            return None, None, None, None
         try:
             dns = dpkt.dns.DNS(payload)
+            is_response = dns.qr == dpkt.dns.DNS_R
+            rcode = dns.rcode if is_response else None
             if dns.qd:
                 q = dns.qd[0]
-                return q.name, q.type
+                return q.name, q.type, is_response, rcode
+            return None, None, is_response, rcode
         except Exception:
             pass
-        return None, None
+        return None, None, None, None
 
     def _parse_tls_client_hello(self, payload: str | bytes) -> Tuple[Optional[str], Optional[str], Optional[List[int]]]:
         """Safely parse unencrypted TLS ClientHello metadata (SNI, Ciphers)."""

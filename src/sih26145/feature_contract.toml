@@ -1,0 +1,124 @@
+# Unidirectional Feature Contract — the single declaration of every feature SIH26145 computes.
+#
+# Layer 1 (this file): a static state per feature.
+#   computable        fully derivable from whichever half of the conversation is captured
+#   degraded          derivable, with the stated loss
+#   reverse_dependent needs the other half; computed only when the flow observed it
+#                     (FlowRecord.reverse_seen / responder_seen), else UnavailableFeatureError
+#   unavailable       unobtainable here: needs decryption, active probing, or our own handshake
+# Layer 2 (runtime): FlowRecord.observability_state per flow — see docs/ARCHITECTURE.md §5-6.
+#
+# Columns: tier = flow | host | dst | pair | global | link
+#          approx = exact | hll | cms | bucketed | ewma   (estimation error, separate from state)
+#          sources = ingest adapters that yield it (dpkt, zeek)
+# Consumers (detectors, models) declare max_state and the exact features they read;
+# tests/contract/ checks their source code against these declarations.
+# Changing a row or a consumer's reads = bump contract_version.
+
+contract_version = "1.0.0"
+
+features = [
+  # ---- Tier 1: per-flow FeatureVector ------------------------------------------------------
+  { name = "duration",                state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Span of observed packets; covers both halves when both are captured." },
+  { name = "total_packets",           state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Count of observed packets (both halves if captured)." },
+  { name = "total_bytes",             state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Sum of observed frame lengths. Undercounts under snaplen truncation (AUDIT A8)." },
+  { name = "pps",                     state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "total_packets / duration; meaningless for sub-millisecond flows (AUDIT A1)." },
+  { name = "bps",                     state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "total_bytes / duration; same caveats as pps and total_bytes." },
+  { name = "pkt_size_min",            state = "computable", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "Observed frame sizes. Zeek conn.log has no size distribution." },
+  { name = "pkt_size_max",            state = "computable", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "As pkt_size_min." },
+  { name = "pkt_size_mean",           state = "computable", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "As pkt_size_min." },
+  { name = "pkt_size_std",            state = "computable", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "As pkt_size_min." },
+  { name = "pkt_size_q25",            state = "computable", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "As pkt_size_min." },
+  { name = "pkt_size_q50",            state = "computable", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "As pkt_size_min." },
+  { name = "pkt_size_q75",            state = "computable", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "As pkt_size_min." },
+  { name = "iat_mean",                state = "computable", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "Inter-arrival over all observed packets (both halves interleaved if captured). Zeek needs the IAT script." },
+  { name = "iat_var",                 state = "computable", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "As iat_mean." },
+  { name = "iat_min",                 state = "computable", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "As iat_mean." },
+  { name = "iat_max",                 state = "computable", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "As iat_mean." },
+  { name = "jitter",                  state = "computable", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "Mean |delta IAT|; as iat_mean." },
+  { name = "burstiness_ratio",        state = "computable", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "Coefficient of variation of packet SIZE, not temporal burstiness (AUDIT A1)." },
+  { name = "small_pkt_ratio",         state = "computable", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "Fraction of observed frames < 64 bytes." },
+  { name = "is_tcp",                  state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "IP protocol header." },
+  { name = "is_udp",                  state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "IP protocol header." },
+  { name = "is_icmp",                 state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "IP protocol header." },
+  { name = "dst_port",                state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Destination port of the flow key (first observed packet)." },
+  { name = "dns_query_count",         state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Question section is present in both queries and responses, so either half yields it." },
+  { name = "dns_max_domain_entropy",  state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Shannon entropy of the queried name; either half." },
+  { name = "dns_max_subdomain_depth", state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Label count of the queried name; either half." },
+  { name = "tls_client_hello_count",  state = "degraded",   tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Needs the client half (ClientHello); absent on reverse_only flows. QUIC ClientHellos are unavailable (encrypted)." },
+  { name = "tls_max_sni_entropy",     state = "degraded",   tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Client half only; SNI replaced by the public name under ECH." },
+  { name = "tls_max_sni_length",      state = "degraded",   tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "As tls_max_sni_entropy." },
+  { name = "has_syn",                 state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "OR of TCP flags over observed packets." },
+  { name = "has_fin",                 state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "OR of TCP flags over observed packets." },
+  { name = "has_rst",                 state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "OR of TCP flags over observed packets." },
+
+  # ---- Flow-level direction and observability ----------------------------------------------
+  { name = "reverse_seen",            state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Packets matching the reversed 5-tuple were observed (zeek: resp_pkts > 0)." },
+  { name = "flow_direction",          state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "outbound/inbound/internal/external from the internal-CIDR policy; no reverse half needed." },
+  { name = "egress_bytes",            state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Bytes observed travelling internal -> external in this flow, whichever half carried them." },
+
+  # ---- Reverse-dependent: computed only when the needed half was observed on this flow --------
+  { name = "outbound_inbound_byte_ratio", state = "reverse_dependent", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Needs bytes in both directions. Never estimated when the inbound half is missing." },
+  { name = "tcp_handshake_completed", state = "reverse_dependent", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "SYN in one direction and SYN-ACK in the other." },
+  { name = "tcp_rtt",                 state = "reverse_dependent", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "Tap-observed SYN -> SYN-ACK delay: the responder leg as seen from the tap." },
+  { name = "dns_nxdomain_rate",       state = "reverse_dependent", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Needs the resolver's responses (responder half); computed when responder_seen." },
+
+  # ---- Unavailable: needs decryption, active probing, or our own handshake -------------------
+  { name = "quic_client_hello",       state = "unavailable", tier = "flow", approx = "exact", sources = [], reason = "QUIC Initial packets are AEAD-protected. The keys are public, but removing them is decryption and the PS forbids detection from decrypted content." },
+  { name = "tls13_server_certificate", state = "unavailable", tier = "flow", approx = "exact", sources = [], reason = "TLS 1.3 encrypts the Certificate message; reading it needs decryption." },
+  { name = "jarm_server_fingerprint", state = "unavailable", tier = "flow", approx = "exact", sources = [], reason = "JARM sends ten crafted ClientHellos: our own handshake. The enclave never transmits." },
+  { name = "service_banner_probe",    state = "unavailable", tier = "flow", approx = "exact", sources = [], reason = "Needs active probing of the destination." },
+]
+
+# ---- Consumers ---------------------------------------------------------------------------
+# max_state: the highest state the consumer may read (computable < degraded < reverse_dependent).
+# reads: exactly the features its code reads; tests/contract/ enforces equality.
+
+[consumers.ddos_volume_detector]
+ps_class = "a"
+max_state = "computable"
+reads = ["pps", "bps", "burstiness_ratio", "total_packets"]
+
+[consumers.c2_beacon_detector]
+ps_class = "b"
+max_state = "computable"
+reads = ["total_packets", "duration", "iat_var", "pps", "iat_mean"]
+
+[consumers.dga_lexical_detector]
+ps_class = "c"
+max_state = "computable"
+reads = ["is_udp", "dst_port", "dns_max_domain_entropy", "dns_query_count"]
+
+[consumers.dns_tunnel_detector]
+ps_class = "c"
+max_state = "computable"
+reads = ["dst_port", "dns_max_subdomain_depth", "dns_query_count", "dns_max_domain_entropy"]
+
+[consumers.encrypted_anomaly_detector]
+ps_class = "d"
+max_state = "degraded"
+reads = ["tls_client_hello_count", "tls_max_sni_entropy", "dst_port", "tls_max_sni_length"]
+
+[consumers.recon_portscan_detector]
+ps_class = "e"
+max_state = "computable"
+reads = ["is_tcp", "small_pkt_ratio", "total_packets", "duration"]
+
+[consumers.exfiltration_detector]
+ps_class = "f"
+max_state = "computable"
+reads = ["bps", "is_icmp", "total_bytes", "duration", "small_pkt_ratio"]
+
+[consumers.ml_flow_models]
+ps_class = "all"
+max_state = "degraded"
+reads = [
+  "duration", "total_packets", "total_bytes", "pps", "bps",
+  "pkt_size_min", "pkt_size_max", "pkt_size_mean", "pkt_size_std",
+  "pkt_size_q25", "pkt_size_q50", "pkt_size_q75",
+  "iat_mean", "iat_var", "iat_min", "iat_max", "jitter",
+  "burstiness_ratio", "small_pkt_ratio", "is_tcp", "is_udp", "is_icmp", "dst_port",
+  "dns_query_count", "dns_max_domain_entropy", "dns_max_subdomain_depth",
+  "tls_client_hello_count", "tls_max_sni_entropy", "tls_max_sni_length",
+  "has_syn", "has_fin", "has_rst",
+]

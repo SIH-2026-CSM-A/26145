@@ -165,12 +165,25 @@ def test_tcp_connection_flags():
     assert flow.is_terminated is True
 
 
-def test_bidirectional_separate_keys():
-    """Verify that forward (A->B) and reverse (B->A) generate separate unidirectional flows."""
+def test_bidirectional_packets_merge_into_one_flow():
+    """A->B and its true reverse B->A (ports swapped) are one flow with reverse_seen.
+
+    Replaces test_bidirectional_separate_keys: the capture may hold both halves of a
+    conversation, and the flow must measure that rather than split it.
+    """
     tracker = FlowTracker()
-    tracker.process_packet(make_packet(100.0, src_ip="1.1.1.1", dst_ip="2.2.2.2"))
-    tracker.process_packet(make_packet(100.1, src_ip="2.2.2.2", dst_ip="1.1.1.1"))
-    
+    tracker.process_packet(make_packet(100.0, src_ip="1.1.1.1", src_port=40000, dst_ip="2.2.2.2", dst_port=80))
+    tracker.process_packet(make_packet(100.1, src_ip="2.2.2.2", src_port=80, dst_ip="1.1.1.1", dst_port=40000, tcp_flags=0x12))
+
+    assert tracker.get_active_flow_count() == 1
+    (flow,) = tracker.flush_expired(200.0)
+    assert flow.reverse_seen is True
+    assert flow.observability_state == "bidirectional"
+    assert (flow.fwd_packets, flow.rev_packets) == (1, 1)
+
+    # Same IPs but not a reversed 5-tuple (ports not swapped) stay separate
+    tracker.process_packet(make_packet(300.0, src_ip="1.1.1.1", dst_ip="2.2.2.2"))
+    tracker.process_packet(make_packet(300.1, src_ip="2.2.2.2", dst_ip="1.1.1.1"))
     assert tracker.get_active_flow_count() == 2
 
 

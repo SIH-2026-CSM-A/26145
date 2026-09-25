@@ -28,7 +28,12 @@ class FlowTracker:
 
     def process_packet(self, pkt: PacketMetadata) -> List[FlowRecord]:
         """Ingest single PacketMetadata into active flow state table.
-        
+
+        In 5-tuple mode a packet whose reversed 5-tuple matches an active flow is attached
+        to that flow as its reverse direction, so each flow measures whether both halves of
+        the conversation are visible. 4-tuple keys carry no source port and cannot be
+        reversed; those flows only ever see one direction.
+
         Returns a list of flushed FlowRecords (e.g. triggered by Active Timeout or LRU Eviction).
         """
         if not pkt.src_ip or not pkt.dst_ip or not pkt.protocol:
@@ -55,6 +60,12 @@ class FlowTracker:
             )
 
         key_tuple = key_obj.to_tuple()
+        is_rev = False
+        if self.mode == "5tuple" and key_tuple not in self._active_flows:
+            rev_tuple = (pkt.dst_ip, dst_port, pkt.src_ip, src_port, pkt.protocol)
+            if rev_tuple in self._active_flows:
+                key_tuple, is_rev = rev_tuple, True
+
         flushed_records: List[FlowRecord] = []
 
         if key_tuple in self._active_flows:
@@ -66,9 +77,12 @@ class FlowTracker:
             if (pkt.timestamp - flow.start_time) >= self.active_timeout:
                 flow.is_active_expired = True
                 flushed_records.append(flow)
-                
-                # Start new flow window for same key
-                flow = FlowRecord(flow_key=key_obj, start_time=pkt.timestamp, last_time=pkt.timestamp)
+
+                # Start new flow window for same key, keeping the original orientation
+                flow = FlowRecord(
+                    flow_key=flow.flow_key, start_time=pkt.timestamp, last_time=pkt.timestamp,
+                    fwd_is_responder=flow.fwd_is_responder,
+                )
                 self._active_flows[key_tuple] = flow
             else:
                 # Calculate Inter-Arrival Time
@@ -83,13 +97,17 @@ class FlowTracker:
                 evicted_flow.is_evicted = True
                 flushed_records.append(evicted_flow)
 
-            flow = FlowRecord(flow_key=key_obj, start_time=pkt.timestamp, last_time=pkt.timestamp)
+            flow = FlowRecord(
+                flow_key=key_obj, start_time=pkt.timestamp, last_time=pkt.timestamp,
+                fwd_is_responder=_looks_like_responder(pkt),
+            )
             self._active_flows[key_tuple] = flow
 
         # Accumulate metrics
         flow.packet_count += 1
         flow.total_bytes += pkt.packet_len
         flow.packet_sizes.append(pkt.packet_len)
+        _accumulate_direction(flow, pkt, is_rev)
 
         if pkt.tcp_flags is not None:
             flow.tcp_flags_seen |= pkt.tcp_flags
@@ -120,3 +138,51 @@ class FlowTracker:
 
     def get_active_flow_count(self) -> int:
         return len(self._active_flows)
+
+
+_SYN, _ACK = 0x02, 0x10
+_ICMP_REPLY_TYPES = {0, 14, 16, 18}   # echo, timestamp, info, address-mask replies
+_ICMP6_REPLY_TYPES = {129}             # echo reply
+
+
+def _looks_like_responder(pkt: PacketMetadata) -> bool:
+    """Heuristic: does the packet that opened a flow come from the responder side?
+
+    ponytail: header heuristics only; a mid-stream capture between two ephemeral ports
+    defaults to "initiator". Only affects the forward_only/reverse_only label of one-sided
+    flows, never whether reverse_seen is true.
+    """
+    if pkt.tcp_flags is not None and pkt.tcp_flags & _SYN:
+        return bool(pkt.tcp_flags & _ACK)
+    if pkt.dns_is_response is not None:
+        return pkt.dns_is_response
+    if pkt.protocol == "ICMP" and pkt.icmp_type is not None:
+        return pkt.icmp_type in _ICMP_REPLY_TYPES
+    if pkt.protocol == "ICMPv6" and pkt.icmp_type is not None:
+        return pkt.icmp_type in _ICMP6_REPLY_TYPES
+    if pkt.src_port is not None and pkt.dst_port is not None:
+        return pkt.src_port < 1024 <= pkt.dst_port
+    return False
+
+
+def _accumulate_direction(flow: FlowRecord, pkt: PacketMetadata, is_rev: bool) -> None:
+    """Per-direction counters, handshake timing and DNS response codes."""
+    flags = pkt.tcp_flags or 0
+    if is_rev:
+        flow.rev_packets += 1
+        flow.rev_bytes += pkt.packet_len
+        flow.rev_tcp_flags |= flags
+    else:
+        flow.fwd_packets += 1
+        flow.fwd_bytes += pkt.packet_len
+        flow.fwd_tcp_flags |= flags
+
+    if flags & _SYN and not flags & _ACK and flow.syn_ts is None:
+        flow.syn_ts, flow.syn_rev = pkt.timestamp, is_rev
+    if flags & _SYN and flags & _ACK and flow.synack_ts is None:
+        flow.synack_ts, flow.synack_rev = pkt.timestamp, is_rev
+
+    if pkt.dns_is_response:
+        flow.dns_responses += 1
+        if pkt.dns_rcode == 3:  # NXDOMAIN
+            flow.dns_nxdomain += 1

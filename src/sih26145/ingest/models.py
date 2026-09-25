@@ -35,6 +35,8 @@ class PacketMetadata:
     # Application - DNS (Observable unencrypted query metadata)
     dns_query_name: Optional[str] = None
     dns_query_type: Optional[int] = None
+    dns_is_response: Optional[bool] = None  # QR bit; None when not DNS
+    dns_rcode: Optional[int] = None         # set on responses only (3 = NXDOMAIN)
 
     # Application - TLS (Observable unencrypted ClientHello metadata)
     tls_version: Optional[str] = None
