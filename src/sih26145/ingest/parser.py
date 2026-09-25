@@ -1,11 +1,11 @@
 """Deterministic Packet Parser for SIH26145."""
 
 import socket
-import struct
 from typing import Optional, Tuple, List
 import dpkt
 
 from sih26145.ingest.models import PacketMetadata
+from sih26145.ingest.tls_fingerprint import ja3, ja3s, ja4, parse_hello
 
 
 class PacketParser:
@@ -44,6 +44,9 @@ class PacketParser:
         tls_ver: Optional[str] = None
         tls_sni: Optional[str] = None
         tls_ciphers: Optional[List[int]] = None
+        tls_ja3: Optional[str] = None
+        tls_ja4: Optional[str] = None
+        tls_ja3s: Optional[str] = None
 
         try:
             link, ip_obj = self._unpack_link(buf)
@@ -96,9 +99,13 @@ class PacketParser:
                     tcp_seq = l4_obj.seq
                     tcp_ack = l4_obj.ack
                     
-                    # Extract TLS ClientHello if present on TCP payload
-                    if dst_port == 443 or src_port == 443 or (hasattr(l4_obj, 'data') and l4_obj.data):
-                        tls_ver, tls_sni, tls_ciphers = self._parse_tls_client_hello(l4_obj.data)
+                    # Cleartext TLS ClientHello / ServerHello on any TCP port
+                    hello = parse_hello(l4_obj.data) if l4_obj.data else None
+                    if hello is not None and hello.is_client:
+                        tls_ver, tls_sni, tls_ciphers = hello.version_name, hello.sni, hello.ciphers
+                        tls_ja3, tls_ja4 = ja3(hello), ja4(hello)
+                    elif hello is not None:
+                        tls_ja3s = ja3s(hello)
                 except Exception:
                     pass
 
@@ -155,6 +162,9 @@ class PacketParser:
             tls_version=tls_ver,
             tls_sni=tls_sni,
             tls_cipher_suites=tls_ciphers,
+            tls_ja3=tls_ja3,
+            tls_ja4=tls_ja4,
+            tls_ja3s=tls_ja3s,
         )
 
     def _unpack_link(self, buf: bytes) -> Tuple[Optional[str], Optional[object]]:
@@ -213,105 +223,3 @@ class PacketParser:
         except Exception:
             pass
         return None, None, None, None
-
-    def _parse_tls_client_hello(self, payload: str | bytes) -> Tuple[Optional[str], Optional[str], Optional[List[int]]]:
-        """Safely parse unencrypted TLS ClientHello metadata (SNI, Ciphers)."""
-        if not payload or not isinstance(payload, bytes):
-            return None, None, None
-
-        # Check TLS Record Header: ContentType == 22 (Handshake), Version == 0x0300..0x0304
-        if len(payload) < 5 or payload[0] != 22:
-            return None, None, None
-
-        try:
-            # Parse record header
-            record_ver_major = payload[1]
-            record_ver_minor = payload[2]
-            record_len = struct.unpack("!H", payload[3:5])[0]
-
-            if len(payload) < 5 + record_len:
-                # Truncated record
-                handshake_data = payload[5:]
-            else:
-                handshake_data = payload[5:5 + record_len]
-
-            if not handshake_data or handshake_data[0] != 1:
-                # HandshakeType != ClientHello (1)
-                return None, None, None
-
-            # Parse ClientHello body
-            pos = 1
-            if len(handshake_data) < 4:
-                return None, None, None
-            msg_len = (handshake_data[1] << 16) | (handshake_data[2] << 8) | handshake_data[3]
-            pos += 3
-
-            client_ver_major = handshake_data[pos]
-            client_ver_minor = handshake_data[pos + 1]
-            pos += 2
-
-            tls_ver_str = f"{client_ver_major}.{client_ver_minor}"
-            if client_ver_major == 3 and client_ver_minor == 3:
-                tls_ver_str = "TLS 1.2"
-            elif client_ver_major == 3 and client_ver_minor == 1:
-                tls_ver_str = "TLS 1.0"
-            elif client_ver_major == 3 and client_ver_minor == 2:
-                tls_ver_str = "TLS 1.1"
-
-            # Skip Random (32 bytes)
-            pos += 32
-            if len(handshake_data) < pos + 1:
-                return tls_ver_str, None, None
-
-            # Session ID
-            sess_id_len = handshake_data[pos]
-            pos += 1 + sess_id_len
-
-            # Cipher Suites
-            if len(handshake_data) < pos + 2:
-                return tls_ver_str, None, None
-            cipher_len = struct.unpack("!H", handshake_data[pos:pos + 2])[0]
-            pos += 2
-
-            ciphers = []
-            if len(handshake_data) >= pos + cipher_len:
-                for i in range(0, cipher_len, 2):
-                    ciphers.append(struct.unpack("!H", handshake_data[pos + i:pos + i + 2])[0])
-            pos += cipher_len
-
-            # Compression Methods
-            if len(handshake_data) < pos + 1:
-                return tls_ver_str, None, ciphers
-            comp_len = handshake_data[pos]
-            pos += 1 + comp_len
-
-            # Extensions
-            sni_name = None
-            if len(handshake_data) >= pos + 2:
-                ext_total_len = struct.unpack("!H", handshake_data[pos:pos + 2])[0]
-                pos += 2
-                ext_end = min(len(handshake_data), pos + ext_total_len)
-
-                while pos + 4 <= ext_end:
-                    ext_type = struct.unpack("!H", handshake_data[pos:pos + 2])[0]
-                    ext_len = struct.unpack("!H", handshake_data[pos + 2:pos + 4])[0]
-                    pos += 4
-
-                    if ext_type == 0:  # server_name extension
-                        if pos + ext_len <= ext_end and ext_len >= 5:
-                            # ServerNameList length (2), ServerNameType (1), ServerName length (2)
-                            list_len = struct.unpack("!H", handshake_data[pos:pos + 2])[0]
-                            name_type = handshake_data[pos + 2]
-                            if name_type == 0:  # host_name
-                                name_len = struct.unpack("!H", handshake_data[pos + 3:pos + 5])[0]
-                                if pos + 5 + name_len <= ext_end:
-                                    sni_bytes = handshake_data[pos + 5:pos + 5 + name_len]
-                                    try:
-                                        sni_name = sni_bytes.decode("ascii")
-                                    except Exception:
-                                        pass
-                    pos += ext_len
-
-            return tls_ver_str, sni_name, ciphers
-        except Exception:
-            return None, None, None

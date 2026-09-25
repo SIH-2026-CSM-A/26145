@@ -120,6 +120,10 @@ class FlowTracker:
         if pkt.tls_sni and pkt.tls_sni not in flow.tls_snis:
             flow.tls_snis.append(pkt.tls_sni)
 
+        for fp_list, fp in ((flow.tls_ja3, pkt.tls_ja3), (flow.tls_ja4, pkt.tls_ja4), (flow.tls_ja3s, pkt.tls_ja3s)):
+            if fp and fp not in fp_list:
+                fp_list.append(fp)
+
         return flushed_records
 
     def flush_expired(self, current_time: float) -> List[FlowRecord]:

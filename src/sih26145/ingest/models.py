@@ -42,3 +42,6 @@ class PacketMetadata:
     tls_version: Optional[str] = None
     tls_sni: Optional[str] = None
     tls_cipher_suites: Optional[List[int]] = None
+    tls_ja3: Optional[str] = None    # ClientHello fingerprints
+    tls_ja4: Optional[str] = None
+    tls_ja3s: Optional[str] = None   # ServerHello fingerprint (responder half)

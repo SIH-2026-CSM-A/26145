@@ -52,6 +52,10 @@ features = [
   { name = "has_fin",                 state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "OR of TCP flags over observed packets." },
   { name = "has_rst",                 state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "OR of TCP flags over observed packets." },
 
+  { name = "tls_ja3",                 state = "degraded",   tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "JA3 of the cleartext ClientHello: client half only; not available for QUIC." },
+  { name = "tls_ja4",                 state = "degraded",   tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "JA4 (TCP 't' variant) of the cleartext ClientHello: client half only; QUIC 'q' variant needs decryption." },
+  { name = "tls_ja3s",                state = "degraded",   tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "JA3S of the cleartext ServerHello: server half only. JA4S deferred (FoxIO licence)." },
+
   # ---- Flow-level direction and observability ----------------------------------------------
   { name = "reverse_seen",            state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Packets matching the reversed 5-tuple were observed (zeek: resp_pkts > 0)." },
   { name = "flow_direction",          state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "outbound/inbound/internal/external from the internal-CIDR policy; no reverse half needed." },
@@ -61,6 +65,7 @@ features = [
   { name = "outbound_inbound_byte_ratio", state = "reverse_dependent", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Needs bytes in both directions. Never estimated when the inbound half is missing." },
   { name = "tcp_handshake_completed", state = "reverse_dependent", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "SYN in one direction and SYN-ACK in the other." },
   { name = "tcp_rtt",                 state = "reverse_dependent", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "Tap-observed SYN -> SYN-ACK delay: the responder leg as seen from the tap." },
+  { name = "tls_client_server_fp_pair", state = "reverse_dependent", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "JA4 of the ClientHello paired with JA3S of the ServerHello: needs both halves." },
   { name = "dns_nxdomain_rate",       state = "reverse_dependent", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Needs the resolver's responses (responder half); computed when responder_seen." },
 
   # ---- Unavailable: needs decryption, active probing, or our own handshake -------------------

@@ -61,6 +61,9 @@ class FlowRecord:
     syn_rev: bool = False
     synack_ts: Optional[float] = None   # first SYN+ACK
     synack_rev: bool = False
+    tls_ja3: List[str] = field(default_factory=list)
+    tls_ja4: List[str] = field(default_factory=list)
+    tls_ja3s: List[str] = field(default_factory=list)
     dns_responses: int = 0
     dns_nxdomain: int = 0
 

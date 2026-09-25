@@ -94,6 +94,14 @@ def dns_nxdomain_rate(flow: FlowRecord, policy: NetworkPolicy) -> Optional[float
     return flow.dns_nxdomain / flow.dns_responses if flow.dns_responses else None
 
 
+def tls_client_server_fp_pair(flow: FlowRecord, policy: NetworkPolicy) -> Optional[str]:
+    """"<ja4>|<ja3s>" when both hellos were captured on this flow."""
+    _need_both_halves(flow, "tls_client_server_fp_pair")
+    if not flow.tls_ja4 or not flow.tls_ja3s:
+        return None
+    return f"{flow.tls_ja4[0]}|{flow.tls_ja3s[0]}"
+
+
 FLOW_FEATURES: Dict[str, Callable[[FlowRecord, NetworkPolicy], Any]] = {
     "reverse_seen": lambda flow, policy: flow.reverse_seen,
     "flow_direction": flow_direction,
@@ -102,6 +110,10 @@ FLOW_FEATURES: Dict[str, Callable[[FlowRecord, NetworkPolicy], Any]] = {
     "tcp_handshake_completed": tcp_handshake_completed,
     "tcp_rtt": tcp_rtt,
     "dns_nxdomain_rate": dns_nxdomain_rate,
+    "tls_client_server_fp_pair": tls_client_server_fp_pair,
+    "tls_ja3": lambda flow, policy: flow.tls_ja3[0] if flow.tls_ja3 else None,
+    "tls_ja4": lambda flow, policy: flow.tls_ja4[0] if flow.tls_ja4 else None,
+    "tls_ja3s": lambda flow, policy: flow.tls_ja3s[0] if flow.tls_ja3s else None,
 }
 
 
