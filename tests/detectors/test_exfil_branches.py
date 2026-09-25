@@ -28,10 +28,13 @@ async def exfil_alerts(tmp_path, bidirectional):
 
 @pytest.mark.asyncio
 async def test_forward_only_capture_takes_the_substitute_path_and_names_it(tmp_path):
-    (alert,) = await exfil_alerts(tmp_path, bidirectional=False)
+    alerts = await exfil_alerts(tmp_path, bidirectional=False)
+    assert len(alerts) == 1, f"expected one exfil alert, got {len(alerts)}"
+    alert = alerts[0]
     assert alert["observability_state"] == "forward_only"
     assert alert["detection"]["rule_matches"] == ["RULE_EXFIL_EGRESS_BASELINE"]
-    (sub,) = alert["substitutions"]
+    assert len(alert["substitutions"]) == 1, "forward-only exfil alert must name its substitution"
+    sub = alert["substitutions"][0]
     assert sub["unavailable_on_this_flow"] == "outbound_inbound_byte_ratio"
     assert sub["substituted_by"] == ["src_egress_bytes_z", "dst_distinct_srcs_longterm", "off_hours"]
     features = {e["feature"] for e in alert["evidence"]}
@@ -42,7 +45,9 @@ async def test_forward_only_capture_takes_the_substitute_path_and_names_it(tmp_p
 
 @pytest.mark.asyncio
 async def test_bidirectional_capture_takes_the_ratio_path(tmp_path):
-    (alert,) = await exfil_alerts(tmp_path, bidirectional=True)
+    alerts = await exfil_alerts(tmp_path, bidirectional=True)
+    assert len(alerts) == 1, f"expected one exfil alert, got {len(alerts)}"
+    alert = alerts[0]
     assert alert["observability_state"] == "bidirectional"
     assert alert["detection"]["rule_matches"] == ["RULE_EXFIL_OUTBOUND_RATIO"]
     assert alert["substitutions"] == []
