@@ -129,7 +129,11 @@ Run full test suite:
 uv run pytest
 ```
 
-Run performance benchmark:
+Throughput benchmark (flows/s, Mbps, drop %, alert latency) on a capture of your choice:
 ```bash
-uv run python scripts/benchmark.py
+uv run python scripts/benchmark.py path/to/capture.pcap              # capacity
+uv run python scripts/benchmark.py path/to/capture.pcap --speed 26   # paced replay
 ```
+Measured on CTU-13 scenario 12 (Intel i5-13450HX, WSL2, Python 3.13.14, one core): about
+121 flows/s and 31 Mbps sustained; at half that load, 0 drops and alert latency p99 641 ms
+after a flow is flushed. Details, all runs and the profile: `docs/BENCHMARK.md`.

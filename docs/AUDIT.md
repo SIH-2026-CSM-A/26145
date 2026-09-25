@@ -196,14 +196,14 @@ throughput · **AS** structured alert schema · **(a)–(f)** the six threat cla
 | D2 | No windowed state | Fixed: all seven detectors read the store (session 2) |
 | D3 | No JA3/JA4 | Fixed: detector (d) uses JA4 rarity + known-bad list, no port rule (session 2) |
 | D4 | Recon on failed connections | Fixed: fan-out + SYN-only ratio; `failed_tcp` regression capture (session 2) |
-| D5 | Benchmark pps, inflated 50× | Open (TODO Now) |
+| D5 | Benchmark pps, inflated 50× | Fixed: `scripts/benchmark.py` rewritten; flows/s + Mbps measured on CTU-13 scenario 12 (`docs/BENCHMARK.md`, session 2) |
 | D6 | Taxonomy mismatch | Fixed |
 | A1–A2 | DDoS / C2 false positives | Fixed: dst-tier DDoS rules, pair-level C2 with poller suppression; regression captures (session 2) |
 | A3 | Exfil false positives | Fixed (direction-aware detector (f)) |
 | A4 | DGA misfires | Fixed: host-tier DGA/tunnel rules with NXDOMAIN when answered; Ramnit DGA scenario (session 2). qtype still dropped (TODO) |
 | A5 | Fake metrics | Fixed: `/metrics` reports the running pipeline; null when none is attached (session 2) |
 | A6–A7 | Not wired; unbounded latency | Fixed: `serve` (pipeline + API + SSE, one process), bounded queue with drop counter, idle-flush timer (session 2) |
-| A8 | Truncated byte counts | Open (TODO Next) |
+| A8 | Truncated byte counts | Open (TODO Next). The benchmark capture has 0 truncated records, so its Mbps is unaffected |
 | A9 | Direction never measured | Fixed |
 | A10 | Wall-clock timestamps | Fixed |
 | A11 | Drift | Fixed: docs, DB default path, and AGENTS.md rule 7 (owner decision, session 2) |

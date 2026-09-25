@@ -68,6 +68,15 @@ class FlowTracker:
 
         flushed_records: List[FlowRecord] = []
 
+        # Idle expiry is decided by the traffic, not by when a sweep last ran: a packet
+        # arriving after idle_timeout closes the old flow and starts a new one.
+        stale = self._active_flows.get(key_tuple)
+        if stale is not None and pkt.timestamp - stale.last_time >= self.idle_timeout:
+            del self._active_flows[key_tuple]
+            stale.is_idle_expired = True
+            flushed_records.append(stale)
+            key_tuple, is_rev = key_obj.to_tuple(), False
+
         if key_tuple in self._active_flows:
             # Move to end (mark as recently used)
             flow = self._active_flows[key_tuple]

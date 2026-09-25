@@ -268,7 +268,20 @@ campaign graph (hosts as nodes, alerts as edges, grouped by `campaign_id`).
 - Throughput is reported as **flows/sec and Mbps** (the PS units), end-to-end, on a stated
   replay, with hardware and Python version named. Packets/sec may be shown only alongside.
 - No figure is written anywhere until it has been measured on the named machine.
-  Current state: **no throughput figure exists** (AUDIT D5).
+- **Throughput, measured 2026-09-25** (`docs/BENCHMARK.md` has every run and the commands).
+  - Capture: CTU-13 scenario 12 (281.2 MiB, 352,266 packets, 8,927 flows).
+  - Machine: Intel i5-13450HX, WSL2, Python 3.13.14; the pipeline uses one core.
+  - Scope: end to end, including both synthetic ML models on every flow and SQLite WAL
+    writes.
+  - **Sustained capacity: ~121 flows/s (120.6–124.4 over three runs) and ~31 Mbps
+    (31.3–32.2).**
+  - Paced at ~50% of capacity (26× real time): 0 drops; alert latency (flush → published)
+    is p50 165 ms, p95 496 ms, p99 641 ms.
+  - At ~2× capacity with a 1,000-flow queue: 42.6% of flows are dropped, and every drop is
+    counted.
+  - The profile puts ~93% of the time in per-flow single-row sklearn predict calls
+    (IsolationForest 73.6%, RandomForest 19.1%). The tier-2 store, the rules and the
+    aggregator are each under 1%.
 - **FeatureStore memory, default configuration** (4,096 hosts, 4,096 destinations, 32,768
   pairs, HLL p=8): stated ceiling from `memory_ceiling_bytes()` = **42.19 MiB**. Measured
   at full occupancy (98,304 flow updates, every table at its cap) under `tracemalloc`:
@@ -324,4 +337,4 @@ campaign graph (hosts as nodes, alerts as edges, grouped by `campaign_id`).
 | Pipeline → API → SSE wiring | Implemented: `sih26145 serve` runs both in one process; `/metrics` reads the live pipeline; browser-checked |
 | Dashboard v2 fields | Implemented (evidence, capture visibility, substitutions); browser-checked |
 | Campaign graph, visibility gauge | Not started |
-| Throughput benchmark (flows/s, Mbps) | Not started (AUDIT D5) |
+| Throughput benchmark (flows/s, Mbps) | Measured on CTU-13 scenario 12: ~121 flows/s, ~31 Mbps, one core (`docs/BENCHMARK.md`) |

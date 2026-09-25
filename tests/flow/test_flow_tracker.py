@@ -205,3 +205,22 @@ def test_malformed_metadata_handling():
     pkt = PacketMetadata(timestamp=100.0, captured_len=50, packet_len=50, src_ip=None, dst_ip="10.0.0.1", protocol="TCP")
     assert tracker.process_packet(pkt) == []
     assert tracker.get_active_flow_count() == 0
+
+
+def test_packet_after_idle_timeout_starts_a_new_flow_without_a_sweep():
+    """Flow boundaries come from the traffic, not from when flush_expired last ran."""
+    from sih26145.flow.tracker import FlowTracker
+    from sih26145.ingest.models import PacketMetadata
+
+    def pkt(t, src="10.0.0.1", dst="10.0.0.2", sport=5000, dport=80):
+        return PacketMetadata(timestamp=t, captured_len=60, packet_len=60, src_ip=src, dst_ip=dst,
+                              protocol="TCP", src_port=sport, dst_port=dport, tcp_flags=0x10)
+
+    tracker = FlowTracker(idle_timeout=15.0)
+    assert tracker.process_packet(pkt(0.0)) == []
+    assert tracker.process_packet(pkt(10.0)) == []                 # within the timeout: same flow
+    flushed = tracker.process_packet(pkt(30.0, "10.0.0.2", "10.0.0.1", 80, 5000))  # 20 s idle, reverse direction
+    assert len(flushed) == 1, "the idle flow must close when the next packet arrives"
+    assert flushed[0].is_idle_expired and flushed[0].packet_count == 2
+    (new,) = tracker._active_flows.values()
+    assert new.flow_key.src_ip == "10.0.0.2" and new.packet_count == 1   # oriented by its own first packet

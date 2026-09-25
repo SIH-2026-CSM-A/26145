@@ -1,5 +1,167 @@
 # Session Log
 
+## 2026-09-25 — Claude Code (Opus 5.5) — session 2: real detectors, streaming, first throughput figure
+
+**Agent:** Claude Code (Anthropic, model Opus 5.5). Branch `main`, starting at `4505ec9`
+(141 tests passing). No other agent worked on the repo during this session.
+
+### Shipped (commits in order)
+0. `d5531d8 docs:` — owner decisions:
+   - contract 1.0.1 accepts the broader NXDOMAIN rule (computed whenever resolver responses
+     were captured, including a responses-only capture);
+   - AGENTS.md rule 7 now names `~/NewProjects/26145`.
+1. `18de166 test:` — benign regression suite (`tests/regression/`). Generated pcaps run
+   through the real pipeline, each asserting zero alerts:
+   - the audit's list: `ping -c 6`, 10 s RTP, www.google.com and CDN lookups,
+     IMAPS/SMTPS/DoT, two segments 100 µs apart, one-way HTTPS download, a failed TCP
+     connection, and a 50-host poller every 30 s;
+   - plus the owner-requested counterexamples: flash crowd, busy resolver, mail PTR burst.
+
+   10 of 11 were red at this commit (strict xfail naming the AUDIT id); only the one-way
+   download passed (A3, fixed in session 1).
+2. `f80eeed feat(detectors):` — (a)–(e) rewritten on tier-2 store features (ruleset
+   2.0.0, contract 1.1.0).
+   - (a) has three rules: SYN flood; **UDP reflection/amplification** (unsolicited flows
+     from reflector ports, mean packet size, reflector bytes); and a **few-source
+     volumetric flood** against the destination's EWMA baseline. Owner change to the plan:
+     reflection is in PS (a), so it is not a stated limitation.
+   - (b) pair inter-flow CV, with poller suppression by periodic fan-out plus an allowlist
+     file.
+   - (c) DGA uses NXDOMAIN when answered, with a named substitution otherwise; tunnel uses
+     volume × qname length.
+   - (d) known-bad JA4 list (ships empty) and a rare-JA4 repeated-session rule; no port
+     rule.
+   - (e) fan-out + SYN-only, skipping shared infrastructure.
+   - One alert per (detector, entity) per 300 s.
+   - **ML gate:** synthetic RF/IF scores attach to rule alerts but never create or inflate
+     one.
+   - Attack scenarios cover every detector, including a Ramnit DGA.
+3. `db6d8ab feat(streaming):` — `streaming.run_stream`:
+   - bounded asyncio queue with an exported drop counter (paced/live; offline analysis is
+     lossless);
+   - idle-flush timer;
+   - `sih26145 serve` runs pipeline + FastAPI + SSE in one process;
+   - `/api/v1/metrics` returns live values;
+   - dashboard pipeline status row.
+4. `perf:` (this commit):
+   - rewritten `scripts/benchmark.py`, `docs/BENCHMARK.md`, and ARCHITECTURE §13 figures;
+   - tracker fix: a packet after `idle_timeout` starts a new flow, whether or not a sweep
+     ran (found by the benchmark, see below);
+   - docs.
+
+### Verification
+- `uv run pytest`: **177 passed**. That is 141 at session start, with 8 test IDs replaced
+  (listed below) and 44 added. The 2 warnings are the third-party deprecations present at
+  baseline.
+- Every benign capture raises 0 alerts. Each attack capture fires its own detector exactly
+  once; the TLS beacon also fires C2, as it is periodic too. C2 fires at 20% and at 40%
+  uniform jitter.
+- The contract AST test is green with the new reads. Ruff (default rules, `--isolated`):
+  42 at session start, 40 now, no new findings. `npm run build` passes.
+- **`serve` in headless Chromium** (Playwright, demo capture at 3×):
+  - metrics cards were non-null while running (flows/s, Mbps, queue, latency, visibility);
+  - alert rows grew over SSE without reload, reaching 11 of 11 demo alerts across all
+    classes;
+  - 0 console errors.
+
+  This check found one display defect: the timeline plotted the finished-run average as a
+  final spike. The timeline now plots live-window points only.
+- CTU-13: `pgrep -x tar` showed no extraction running. All 52 archive members were present
+  in `extracted/` at their exact listed sizes, so nothing was re-extracted and nothing was
+  written under `raw/`.
+
+### Throughput (measured; details in docs/BENCHMARK.md)
+- Setup: CTU-13 scenario 12 (281.2 MiB, 352,266 packets, 8,927 flows); i5-13450HX, WSL2,
+  Python 3.13.14, one core; end to end including both ML models on every flow and SQLite
+  WAL.
+- **Unthrottled: 120.6–124.4 flows/s, 31.3–32.2 Mbps** (3 runs).
+- Paced 26× (~50% of capacity): 0 drops; alert latency p50/p95/p99 165/496/641 ms from
+  flush to published.
+- Overload at 104× with a 1k queue: 42.6% of flows dropped, all counted.
+- Profile: IsolationForest predict 73.6%, RandomForest predict 19.1% (single-row predict
+  per flow; sklearn per-tree dispatch and per-call `warnings` handling dominate), dpkt
+  parsing 3.5%, feature extraction 1.4%, tracker 0.9%. Not optimised.
+
+### Falsification log (each break on one line, red on an assertion, then restored)
+| Target | Break | Red test |
+|---|---|---|
+| (a) SYN flood | SYN-only threshold 0.8 → 0 | `test_benign_capture_raises_no_alerts[flash_crowd]` |
+| (a) reflection | drop the "endpoint never initiated/answered" check | `[busy_resolver]` |
+| (a) volumetric | drop `dst_distinct_srcs_w <= 10` | `[flash_crowd]` |
+| (b) C2 | poller suppression disabled | `[monitoring_poller]` (50 alerts) |
+| (c) DGA | NXDOMAIN "names resolve" suppression disabled | `[cdn_heavy_browsing]` |
+| (c) tunnel | mean qname length 40 → 20 | `[mail_ptr_burst]` |
+| (d) encrypted | drop the `pair_flows_w >= 5` requirement | `[tls_mail_and_dot]` |
+| (e) recon | fan-out threshold 20 → 1 | `[failed_tcp]` |
+| (f) exfil | ratio branch never taken (ignore reverse_seen) | `test_bidirectional_capture_takes_the_ratio_path` |
+| ML gate | `ml_can_alert=True` | `[ping_c6]` (IsolationForest) |
+| Tracker idle split | disable the on-arrival idle check | `test_packet_after_idle_timeout_starts_a_new_flow_without_a_sweep` |
+
+The first (c) DGA attempt did **not** go red: 30 CDN names gave only 13 labels at or above
+3.5 bits, below the count threshold. The benign capture was raised to 50 CDN lookups (28
+high-entropy) and the break then went red.
+
+### Found and fixed along the way
+- **Generator clockwork.** Three benign/baseline generators spaced events on an exact
+  clock and so tripped C2, which says nothing about detection. They now use independent
+  random times, as real traffic does:
+  - PTR lookups 0.9 s apart;
+  - baseline web clients sorted into even slots;
+  - flash-crowd baseline clients.
+- **C2 on port sweeps.** A sweep at a fixed 5 ms rate is periodic. C2 now requires a mean
+  period of at least 1 s (beacons sleep; scanners don't).
+- **Model version on gated alerts.** A gated ML score attached to a rule alert now marks it
+  HYBRID, so `model_version` names `ml-synthetic-baseline`. Confidence and severity stay
+  the rule's.
+- **Tracker (found by the benchmark).** Flow boundaries depended on sweep timing: at 26×
+  replay a 1 s wall tick is 26 s of capture time, so packets after a 15 s gap merged into
+  stale flows. Paced runs yielded 8,606 flows against 8,917 and fewer alerts. Idle expiry
+  is now decided on packet arrival. All benchmark runs were redone after the fix, and all
+  runs give 8,927 flows.
+
+### Decided
+- **DGA scenario is Ramnit, not the Wikipedia/CryptoLocker example.** The Wikipedia
+  example reproduces its published vectors (2014-01-07 → intgmxdeadnxuyla.com), but it
+  yields only 16 distinct names over 200 dates. Ramnit (J. Bader) reproduces the published
+  `example_domains.txt` from seed 0x79159C10. The reference repo is GPL-2.0, so the
+  implementation here is our own from the algorithm description; no code was copied.
+- **Reflection uses dedicated reflector counters.** `dst_reflector_bytes_w` and mean
+  packet size are counted per victim endpoint, not `dst_bytes_w`: a victim is not the
+  flow-key destination when it initiated. The contract states the degraded case: a capture
+  holding only inbound halves cannot tell solicited answers from unsolicited ones.
+- **Dedup:** one alert per (detector, entity) per 300 s of event time. Exfil is not
+  deduplicated.
+- **Rates in `/metrics`:** the last ~5 s while running, the whole run once finished, with
+  `rate_window_s` saying which. `alert_latency_ms` is null until an alert exists.
+- **No dependency added.** cProfile (stdlib) was used for the profile; py-spy is not
+  installed and was not needed.
+
+### Existing tests changed (8 IDs replaced)
+- `tests/detectors/test_rule_detectors.py`: 7 FeatureVector-only tests pinned the old
+  per-flow rules. They were replaced by 9 store-driven tests (flows fed through a
+  FeatureStore in order). Replaced: `test_ddos_volume_detector_hit`,
+  `test_c2_beacon_detector_hit`, `test_dga_lexical_detector_hit`,
+  `test_dns_tunnel_detector_hit`, `test_recon_portscan_detector_hit`,
+  `test_encrypted_anomaly_detector_hit`, `test_detector_threshold_boundaries` (now a C2
+  gap-count boundary).
+- `test_ml_alerts_declare_the_synthetic_model` became
+  `test_alerts_carrying_ml_scores_declare_the_synthetic_model`, since under the gate an ML
+  prediction alone raises nothing.
+- Not renamed, but changed:
+  - `test_evidence_aggregation_ml_only` and `..._hybrid...` pass `ml_can_alert=True` (the
+    path a trained model takes);
+  - `test_metrics_report_only_measured_values` checks the new null fields;
+  - `test_pipeline_end_to_end_performance_benchmark` budget went from 5 s per file to
+    2 ms per packet, because the demo capture grew from 184 to 20,640 packets;
+  - `test_feature_store` imports READERS from `store_readers`.
+
+### Incomplete / next
+- ML scoring is ~93% of pipeline time. See TODO Now; it was deliberately not optimised.
+- Thresholds are hand-set on generated captures; no precision/recall on real labels yet.
+- Under saturation, queued flows wait for the producer to finish reading (latency 30–57 s
+  unthrottled). The live-capture scheduling policy is a TODO.
+- A8 (truncated byte counts) is still open; the benchmark capture is unaffected.
+
 ## 2026-09-25 — Claude Code (Opus 5.5) — foundation session
 
 **Agent:** Claude Code (Anthropic, model Opus 5.5). Branch `main`, starting at tag
