@@ -15,7 +15,7 @@
 # tests/contract/ checks their source code against these declarations.
 # Changing a row or a consumer's reads = bump contract_version.
 
-contract_version = "1.0.0"
+contract_version = "1.0.1"
 
 features = [
   # ---- Tier 1: per-flow FeatureVector ------------------------------------------------------
@@ -70,7 +70,7 @@ features = [
   { name = "src_distinct_qnames_w",     state = "computable", tier = "host", approx = "hll",      sources = ["dpkt", "zeek"], reason = "Distinct queried names per client." },
   { name = "src_high_entropy_qnames_w", state = "computable", tier = "host", approx = "exact",    sources = ["dpkt", "zeek"], reason = "Queried names whose first label has Shannon entropy >= 3.5 bits (configurable)." },
   { name = "src_qname_len_sum_w",       state = "computable", tier = "host", approx = "exact",    sources = ["dpkt", "zeek"], reason = "Total characters queried: a volume proxy for DNS tunnelling." },
-  { name = "src_nxdomain_rate_w",       state = "reverse_dependent", tier = "host", approx = "exact", sources = ["dpkt", "zeek"], reason = "NXDOMAIN share of resolver responses to this client; needs the responder half of its DNS flows." },
+  { name = "src_nxdomain_rate_w",       state = "reverse_dependent", tier = "host", approx = "exact", sources = ["dpkt", "zeek"], reason = "NXDOMAIN share of resolver responses to this client. Computed whenever resolver responses were captured, including a responses-only capture; raises UnavailableFeatureError when none were." },
   { name = "src_distinct_ja4_w",        state = "degraded",   tier = "host", approx = "hll",      sources = ["dpkt", "zeek"], reason = "Distinct JA4 client fingerprints; needs the client half." },
   { name = "src_egress_bytes_1m",       state = "degraded",   tier = "host", approx = "exact",    sources = ["dpkt", "zeek"], reason = "Internal->external bytes from this host in the current minute. Counts only captured halves: a capture holding only inbound halves sees no egress." },
   { name = "src_egress_bytes_5m",       state = "degraded",   tier = "host", approx = "exact",    sources = ["dpkt", "zeek"], reason = "As src_egress_bytes_1m, last 5 one-minute buckets." },
@@ -96,7 +96,7 @@ features = [
   { name = "tcp_handshake_completed", state = "reverse_dependent", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "SYN in one direction and SYN-ACK in the other." },
   { name = "tcp_rtt",                 state = "reverse_dependent", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "Tap-observed SYN -> SYN-ACK delay: the responder leg as seen from the tap." },
   { name = "tls_client_server_fp_pair", state = "reverse_dependent", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "JA4 of the ClientHello paired with JA3S of the ServerHello: needs both halves." },
-  { name = "dns_nxdomain_rate",       state = "reverse_dependent", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Needs the resolver's responses (responder half); computed when responder_seen." },
+  { name = "dns_nxdomain_rate",       state = "reverse_dependent", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Needs the resolver's responses. Computed whenever they were captured (responder_seen), including a responses-only capture that never saw the query; unavailable otherwise." },
 
   # ---- Unavailable: needs decryption, active probing, or our own handshake -------------------
   { name = "quic_client_hello",       state = "unavailable", tier = "flow", approx = "exact", sources = [], reason = "QUIC Initial packets are AEAD-protected. The keys are public, but removing them is decryption and the PS forbids detection from decrypted content." },

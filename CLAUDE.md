@@ -2,7 +2,6 @@
 
 Read AGENTS.md (standing rules), docs/ARCHITECTURE.md, docs/AUDIT.md, TODO.md first.
 
-- Repo lives at `~/NewProjects/26145`, not `~/NewProjects/sih26145` as AGENTS.md rule 7 says.
 - Work on `main`. `master` is an older, empty branch. Tag `baseline-antigravity` = intake state.
 - Tests: `uv run pytest -q`. Python is 3.13 in `.venv` (pyproject says >=3.11).
 - "Unidirectional" = the enclave never transmits. The *capture* may hold both halves of a

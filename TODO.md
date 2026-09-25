@@ -31,8 +31,6 @@ IDs in brackets refer to docs/AUDIT.md.
 - [ ] Split flow-tier size/IAT stats per direction on bidirectional flows.
 - [ ] JA4S server fingerprint once the FoxIO licence is reviewed (JA3S used meanwhile).
 - [ ] Reverse-key matching in 4-tuple flow mode.
-- [ ] AGENTS.md rule 7 names `~/NewProjects/sih26145`; repo is `~/NewProjects/26145`.
-      Owner to decide which is right (not changed by an agent).
 
 ## Cut
 - Next-stage kill-chain probability forecasting — the published ceiling (~67% top-3 with

@@ -206,4 +206,4 @@ throughput · **AS** structured alert schema · **(a)–(f)** the six threat cla
 | A8 | Truncated byte counts | Open (TODO Next) |
 | A9 | Direction never measured | Fixed |
 | A10 | Wall-clock timestamps | Fixed |
-| A11 | Drift | Docs and DB default path fixed; AGENTS.md rule 7 path left for the owner |
+| A11 | Drift | Fixed: docs, DB default path, and AGENTS.md rule 7 (owner decision, session 2) |

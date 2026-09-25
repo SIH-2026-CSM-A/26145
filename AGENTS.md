@@ -7,7 +7,7 @@
 5. Read AGENTS.md before every implementation phase.
 6. Prefer WSL2 Ubuntu/Linux for development and testing.
 7. Keep the repository under:
-   ~/NewProjects/sih26145/
+   ~/NewProjects/26145/
 8. Do not work from:
    /mnt/c/
 9. Use evidence-based verification.
