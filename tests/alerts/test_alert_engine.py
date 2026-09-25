@@ -19,13 +19,13 @@ def test_alert_schema_contract():
         flow={"src_ip": "192.168.1.100", "dst_ip": "10.0.0.53", "dst_port": 53, "protocol": "UDP", "window_start": "2026-09-16T15:00:00Z", "window_end": "2026-09-16T15:00:15Z"},
         confidence=0.92,
         severity="HIGH",
-        evidence={"rule_matches": ["RULE_DNS_TUNNEL_PAYLOAD_DEPTH"], "ml_scores": [0.89], "metrics": {"subdomain_depth": 5}},
+        detection={"rule_matches": ["RULE_DNS_TUNNEL_PAYLOAD_DEPTH"], "ml_scores": [0.89], "metrics": {"subdomain_depth": 5}},
         feature_summary={"total_packets": 50, "total_bytes": 15000, "pps": 3.33, "bps": 1000.0},
     )
     
     d = alert.to_dict()
-    assert d["$schema"] == "https://sih26145.ntro.gov.in/schemas/alert.v1.json"
-    assert d["version"] == "1.0"
+    assert d["$schema"] == "https://sih26145.ntro.gov.in/schemas/alert.v2.json"
+    assert d["version"] == "2.0"
     assert d["alert_id"].startswith("urn:uuid:")
     assert "timestamp" in d
     assert d["threat_class"] == "THREAT_DNS_TUNNEL"
@@ -206,9 +206,9 @@ def test_nan_and_inf_float_sanitization():
     alerts = aggregator.aggregate(flow, fv, rule_hits, [])
     d = alerts[0].to_dict()
     
-    assert d["evidence"]["metrics"]["nan_val"] == 0.0
-    assert d["evidence"]["metrics"]["posinf_val"] == 0.0
-    assert d["evidence"]["metrics"]["neginf_val"] == 0.0
+    assert d["detection"]["metrics"]["nan_val"] == 0.0
+    assert d["detection"]["metrics"]["posinf_val"] == 0.0
+    assert d["detection"]["metrics"]["neginf_val"] == 0.0
     
     json_str = alerts[0].to_json()
     assert isinstance(json_str, str)
@@ -236,7 +236,7 @@ def test_alert_immutability_and_deep_copy():
     alert1 = alerts[0]
     
     evidence_metrics["test_metric"] = 9999
-    assert alert1.to_dict()["evidence"]["metrics"]["test_metric"] == 100
+    assert alert1.to_dict()["detection"]["metrics"]["test_metric"] == 100
 
 
 def test_alert_id_uniqueness():

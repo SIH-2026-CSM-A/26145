@@ -153,13 +153,14 @@ async def run_forensic_verification():
         jdata = json.loads(jdata_str)
         flow = jdata.get("flow", {})
         feat = jdata.get("feature_summary", {})
-        ev = jdata.get("evidence", {})
+        ev = jdata.get("detection", {})
         print(f"\nAnomaly Alert #{idx}:")
         print(f"  ID         : {aid}")
         print(f"  Src/Dst    : {flow.get('src_ip')}:{flow.get('src_port')} -> {flow.get('dst_ip')}:{flow.get('dst_port')} ({flow.get('protocol')})")
         print(f"  Telemetry  : packets={feat.get('total_packets')}, bytes={feat.get('total_bytes')}, pps={feat.get('pps')}, bps={feat.get('bps')}")
         print(f"  Confidence : {conf} (Severity: {sev})")
-        print(f"  Evidence   : {ev}")
+        print(f"  Detection  : {ev}")
+        print(f"  Evidence   : {jdata.get('evidence')} (observability: {jdata.get('observability_state')})")
 
     conn.close()
 

@@ -44,7 +44,7 @@ def main():
                 alerts = await pipeline.process_pcap(args.output_pcap)
                 print(f"Pipeline Analysis Complete. Total threat alerts detected: {len(alerts)}")
                 for a in alerts:
-                    print(f"[{a.severity}] {a.threat_class} | Confidence: {a.confidence*100:.1f}% | Rules: {a.evidence.get('rule_matches')}")
+                    print(f"[{a.severity}] {a.threat_class} | Confidence: {a.confidence*100:.1f}% | Rules: {a.detection.get('rule_matches')} | {a.observability_state}")
             finally:
                 await pipeline.storage.close()
         else:

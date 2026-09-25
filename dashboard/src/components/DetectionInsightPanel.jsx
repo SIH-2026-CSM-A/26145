@@ -23,9 +23,11 @@ export default function DetectionInsightPanel({ alert, onOpenModal }) {
 
   const severityBadgeClass = SEVERITY_BADGES[alert.severity] || 'bg-slate-100 text-slate-700 border-slate-200';
   const confidencePct = (alert.confidence * 100).toFixed(1);
-  const ruleMatches = alert.evidence?.rule_matches || [];
-  const mlScores = alert.evidence?.ml_scores || [];
-  const metrics = alert.evidence?.metrics || {};
+  const ruleMatches = alert.detection?.rule_matches || [];
+  const mlScores = alert.detection?.ml_scores || [];
+  const evidenceRows = Array.isArray(alert.evidence) ? alert.evidence : [];
+  const substitutions = alert.substitutions || [];
+  const observability = alert.observability_state || 'not measured';
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between space-y-4">
@@ -56,6 +58,7 @@ export default function DetectionInsightPanel({ alert, onOpenModal }) {
           <div><span className="text-slate-500">Target:</span> <span className="text-emerald-700 font-semibold">{alert.flow?.dst_ip}:{alert.flow?.dst_port}</span></div>
           <div><span className="text-slate-500">Protocol:</span> <span className="text-slate-800">{alert.flow?.protocol}</span></div>
           <div><span className="text-slate-500">Detector:</span> <span className="text-purple-700 font-semibold">{alert.detector?.name}</span></div>
+          <div className="col-span-2"><span className="text-slate-500">Capture visibility:</span> <span className="text-slate-800 font-semibold">{observability}</span></div>
         </div>
       </div>
 
@@ -85,23 +88,38 @@ export default function DetectionInsightPanel({ alert, onOpenModal }) {
             <div className="flex flex-wrap gap-1">
               {mlScores.map((score, idx) => (
                 <span key={idx} className="bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-mono px-2 py-0.5 rounded font-semibold">
-                  {score.model}: {score.score?.toFixed(3)}
+                  {typeof score === 'number' ? score.toFixed(3) : String(score)}
                 </span>
               ))}
             </div>
           </div>
         )}
 
-        {Object.keys(metrics).length > 0 && (
+        {evidenceRows.length > 0 && (
           <div className="pt-2 border-t border-slate-200">
-            <span className="text-[11px] text-slate-500 block mb-1 font-medium">Synthesized Feature Metrics:</span>
-            <div className="grid grid-cols-2 gap-1 text-[11px] font-mono text-slate-700">
-              {Object.entries(metrics).map(([k, v]) => (
-                <div key={k} className="truncate">
-                  <span className="text-slate-500">{k}:</span> {typeof v === 'number' ? v.toFixed(2) : String(v)}
+            <span className="text-[11px] text-slate-500 block mb-1 font-medium">Evidence (feature · value · baseline):</span>
+            <div className="space-y-0.5 text-[11px] font-mono text-slate-700">
+              {evidenceRows.map((row) => (
+                <div key={row.feature} className="truncate">
+                  <span className="text-slate-500">{row.feature}:</span>{' '}
+                  {typeof row.value === 'number' ? row.value.toFixed(2) : String(row.value)}
+                  {row.baseline !== null && row.baseline !== undefined && (
+                    <span className="text-slate-500"> (baseline {typeof row.baseline === 'number' ? row.baseline.toFixed(2) : String(row.baseline)})</span>
+                  )}
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {substitutions.length > 0 && (
+          <div className="pt-2 border-t border-slate-200">
+            <span className="text-[11px] text-slate-500 block mb-1 font-medium">Substitutions on this flow:</span>
+            {substitutions.map((sub, idx) => (
+              <p key={idx} className="text-[11px] font-mono text-amber-800">
+                {sub.unavailable_on_this_flow} unavailable ({sub.reason}); used {(sub.substituted_by || []).join(', ')}
+              </p>
+            ))}
           </div>
         )}
       </div>

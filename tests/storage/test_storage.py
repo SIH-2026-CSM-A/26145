@@ -19,7 +19,7 @@ async def test_sqlite_save_and_retrieve_round_trip():
         flow={"src_ip": "192.168.1.50", "dst_ip": "10.0.0.53", "dst_port": 53, "protocol": "UDP", "window_start": "2026-09-16T15:00:00Z", "window_end": "2026-09-16T15:00:15Z"},
         confidence=0.95,
         severity="HIGH",
-        evidence={"rule_matches": ["RULE_DNS_TUNNEL_PAYLOAD_DEPTH"], "ml_scores": [], "metrics": {"depth": 5}},
+        detection={"rule_matches": ["RULE_DNS_TUNNEL_PAYLOAD_DEPTH"], "ml_scores": [], "metrics": {"depth": 5}},
         feature_summary={"total_packets": 10, "total_bytes": 1000, "pps": 1.0, "bps": 100.0},
     )
 
@@ -37,7 +37,7 @@ async def test_sqlite_save_and_retrieve_round_trip():
     single_record = await db.get_alert_by_id(alert_id)
     assert single_record is not None
     assert single_record["alert_id"] == alert.alert_id
-    assert single_record["evidence"]["metrics"]["depth"] == 5
+    assert single_record["detection"]["metrics"]["depth"] == 5
 
     await db.close()
 
@@ -53,7 +53,7 @@ async def test_sqlite_sql_injection_defense():
         flow={"src_ip": "192.168.1.10", "dst_ip": "10.0.0.1", "dst_port": 80, "protocol": "TCP"},
         confidence=0.90,
         severity="CRITICAL",
-        evidence={},
+        detection={},
         feature_summary={"total_packets": 100, "total_bytes": 10000, "pps": 10.0, "bps": 1000.0},
     )
     await db.save_alert(alert)
@@ -92,7 +92,7 @@ async def test_sqlite_duplicate_alert_id_replace_behavior():
         flow={"src_ip": "192.168.1.10", "dst_ip": "10.0.0.1", "dst_port": 80, "protocol": "TCP"},
         confidence=0.85,
         severity="MEDIUM",
-        evidence={"attempt": 1},
+        detection={"attempt": 1},
         feature_summary={"total_packets": 5, "total_bytes": 500, "pps": 1.0, "bps": 100.0},
     )
 
@@ -105,7 +105,7 @@ async def test_sqlite_duplicate_alert_id_replace_behavior():
         flow={"src_ip": "192.168.1.10", "dst_ip": "10.0.0.1", "dst_port": 80, "protocol": "TCP"},
         confidence=0.99,
         severity="HIGH",
-        evidence={"attempt": 2},
+        detection={"attempt": 2},
         feature_summary={"total_packets": 5, "total_bytes": 500, "pps": 1.0, "bps": 100.0},
         alert_id=alert_id,
     )
@@ -116,7 +116,7 @@ async def test_sqlite_duplicate_alert_id_replace_behavior():
     assert len(records) == 1
     assert records[0]["confidence"] == 0.99
     assert records[0]["severity"] == "HIGH"
-    assert records[0]["evidence"]["attempt"] == 2
+    assert records[0]["detection"]["attempt"] == 2
 
     await db.close()
 
@@ -136,7 +136,7 @@ async def test_sqlite_filtering_and_pagination():
             flow={"src_ip": "192.168.1.10", "dst_ip": "10.0.0.1", "dst_port": 80, "protocol": "TCP"},
             confidence=0.80,
             severity=severity,
-            evidence={"idx": i},
+            detection={"idx": i},
             feature_summary={"total_packets": 10, "total_bytes": 1000, "pps": 1.0, "bps": 100.0},
         )
         await db.save_alert(alert)

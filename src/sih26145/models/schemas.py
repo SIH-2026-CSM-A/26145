@@ -3,6 +3,10 @@
 from dataclasses import dataclass, field
 from typing import Dict, Any
 
+# The IsolationForest and RandomForest are fitted on synthetic vectors (AUDIT D1);
+# alerts carry this so no ML score is mistaken for a trained model.
+ML_MODEL_VERSION = "synthetic-baseline"
+
 
 @dataclass(frozen=True)
 class MLPrediction:

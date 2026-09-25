@@ -5,11 +5,13 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
+from sih26145.contract import load_contract
+from sih26145.flow.community_id import community_id
 from sih26145.flow.models import FlowRecord
 from sih26145.features.models import FeatureVector
-from sih26145.detectors.models import RuleHit
-from sih26145.models.schemas import MLPrediction
-from sih26145.alerts.models import Alert
+from sih26145.detectors.models import RuleHit, RULESET_VERSION
+from sih26145.models.schemas import MLPrediction, ML_MODEL_VERSION
+from sih26145.alerts.models import Alert, evidence_item
 
 
 SEVERITY_RANKS = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
@@ -31,6 +33,27 @@ def _resolve_ml_severity(probability: float) -> str:
     return "LOW"
 
 
+def _flow_id(flow: FlowRecord) -> str:
+    key = flow.flow_key
+    if key.protocol in ("ICMP", "ICMPv6"):
+        return community_id(key.protocol, key.src_ip, key.dst_ip, flow.icmp_type or 0, flow.icmp_code or 0)
+    return community_id(key.protocol, key.src_ip, key.dst_ip, key.src_port or 0, key.dst_port)
+
+
+def _split_evidence(raw: Dict[str, Any], features) -> tuple:
+    """RuleHit evidence -> (v2 evidence rows for contract features, flat metrics dict)."""
+    rows, metrics = [], {}
+    for name, v in raw.items():
+        if isinstance(v, dict) and "value" in v:
+            value, baseline, source = v["value"], v.get("baseline"), v.get("baseline_source")
+        else:
+            value, baseline, source = v, None, None
+        metrics[name] = deepcopy(value)
+        if name in features:
+            rows.append(evidence_item(name, deepcopy(value), baseline, source))
+    return rows, metrics
+
+
 class EvidenceAggregator:
     """Synthesizes RuleHits and MLPredictions into versioned Alert instances."""
 
@@ -46,8 +69,10 @@ class EvidenceAggregator:
         threat_groups: Dict[str, Dict[str, Any]] = {}
 
         # 1. Process Rule Hits (Phase 07)
+        features = load_contract().features
         for rh in rule_hits:
             tc = rh.threat_class
+            rows, metrics = _split_evidence(rh.evidence, features)
             if tc not in threat_groups:
                 threat_groups[tc] = {
                     "rule_matches": [rh.rule_id],
@@ -56,13 +81,17 @@ class EvidenceAggregator:
                     "confidence": float(rh.confidence),
                     "detector_name": rh.detector_name,
                     "detector_type": "RULE",
-                    "metrics": deepcopy(rh.evidence),
+                    "metrics": metrics,
+                    "evidence": rows,
+                    "substitutions": [deepcopy(s) for s in rh.substitutions],
                 }
             else:
                 if rh.rule_id not in threat_groups[tc]["rule_matches"]:
                     threat_groups[tc]["rule_matches"].append(rh.rule_id)
                 threat_groups[tc]["confidence"] = max(threat_groups[tc]["confidence"], float(rh.confidence))
-                threat_groups[tc]["metrics"].update(deepcopy(rh.evidence))
+                threat_groups[tc]["metrics"].update(metrics)
+                threat_groups[tc]["evidence"] += rows
+                threat_groups[tc]["substitutions"] += [deepcopy(s) for s in rh.substitutions]
                 
                 current_rank = SEVERITY_RANKS.get(threat_groups[tc]["severity"], 1)
                 new_rank = SEVERITY_RANKS.get(rh.severity, 1)
@@ -84,6 +113,8 @@ class EvidenceAggregator:
                         "detector_name": mlp.model_name,
                         "detector_type": "ML",
                         "metrics": deepcopy(mlp.metadata),
+                        "evidence": [],
+                        "substitutions": [],
                     }
                 else:
                     threat_groups[tc]["ml_scores"].append(round(ml_prob, 4))
@@ -99,6 +130,7 @@ class EvidenceAggregator:
         # 3. Formulate Alert objects for active threat groups
         start_iso = datetime.fromtimestamp(flow.start_time, tz=timezone.utc).isoformat()
         end_iso = datetime.fromtimestamp(flow.last_time, tz=timezone.utc).isoformat()
+        flow_id = _flow_id(flow)
 
         flow_meta: Dict[str, Any] = {
             "src_ip": flow.flow_key.src_ip,
@@ -125,13 +157,13 @@ class EvidenceAggregator:
             detector_info = {
                 "name": data["detector_name"],
                 "type": data["detector_type"],
-                "version": "1.0.0",
+                "version": ML_MODEL_VERSION if data["detector_type"] == "ML" else RULESET_VERSION,
             }
-            evidence_info = {
-                "rule_matches": data["rule_matches"],
-                "ml_scores": data["ml_scores"],
-                "metrics": data["metrics"],
-            }
+            model_version = {
+                "RULE": f"rules-{RULESET_VERSION}",
+                "ML": f"ml-{ML_MODEL_VERSION}",
+                "HYBRID_RULE_ML": f"rules-{RULESET_VERSION}+ml-{ML_MODEL_VERSION}",
+            }[data["detector_type"]]
 
             alert = Alert(
                 threat_class=tc,
@@ -139,8 +171,18 @@ class EvidenceAggregator:
                 flow=flow_meta,
                 confidence=min(1.0, max(0.0, float(data["confidence"]))),
                 severity=data["severity"],
-                evidence=evidence_info,
+                detection={
+                    "rule_matches": data["rule_matches"],
+                    "ml_scores": data["ml_scores"],
+                    "metrics": data["metrics"],
+                },
                 feature_summary=feature_summary,
+                evidence=data["evidence"],
+                flow_id=flow_id,
+                observability_state=flow.observability_state,
+                substitutions=data["substitutions"],
+                model_version=model_version,
+                timestamp=end_iso,
             )
             alerts.append(alert)
 

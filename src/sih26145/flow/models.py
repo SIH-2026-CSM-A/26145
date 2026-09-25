@@ -54,6 +54,8 @@ class FlowRecord:
     rev_bytes: int = 0
     fwd_tcp_flags: int = 0
     rev_tcp_flags: int = 0
+    icmp_type: Optional[int] = None     # of the first packet; used for Community ID
+    icmp_code: Optional[int] = None
     fwd_is_responder: bool = False  # first packet looked like a response (see tracker)
     syn_ts: Optional[float] = None      # first SYN without ACK
     syn_rev: bool = False

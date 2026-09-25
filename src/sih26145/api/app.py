@@ -134,13 +134,18 @@ async def get_alert_by_id(
 
 @app.get("/api/v1/metrics")
 async def get_metrics():
-    """Retrieve current traffic and flow metrics."""
-    alerts = await storage.get_alerts(limit=1000)
+    """Traffic and flow metrics.
+
+    Only values that are actually measured are returned. The pipeline is not yet wired to
+    this process (AUDIT A6), so flow and rate telemetry is null rather than invented.
+    """
     return {
-        "active_flows": 12,
-        "packets_per_sec": 45.2,
-        "bytes_per_sec": 12450.0,
-        "total_alerts": len(alerts),
+        "active_flows": None,
+        "packets_per_sec": None,
+        "bytes_per_sec": None,
+        "link_reverse_visibility": None,
+        "telemetry_source": "not_connected",
+        "total_alerts": await storage.count_alerts(),
         "mode": "PASSIVE_READ_ONLY",
     }
 

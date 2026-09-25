@@ -82,6 +82,7 @@ class FlowTracker:
                 flow = FlowRecord(
                     flow_key=flow.flow_key, start_time=pkt.timestamp, last_time=pkt.timestamp,
                     fwd_is_responder=flow.fwd_is_responder,
+                    icmp_type=flow.icmp_type, icmp_code=flow.icmp_code,
                 )
                 self._active_flows[key_tuple] = flow
             else:
@@ -100,6 +101,7 @@ class FlowTracker:
             flow = FlowRecord(
                 flow_key=key_obj, start_time=pkt.timestamp, last_time=pkt.timestamp,
                 fwd_is_responder=_looks_like_responder(pkt),
+                icmp_type=pkt.icmp_type, icmp_code=pkt.icmp_code,
             )
             self._active_flows[key_tuple] = flow
 

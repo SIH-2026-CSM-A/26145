@@ -53,6 +53,7 @@ async def test_end_to_end_pcap_analysis():
         # Verify SQLite storage contains alerts
         persisted_alerts = await pipeline.storage.get_alerts(limit=1000)
         assert len(persisted_alerts) == len(alerts)
+        await pipeline.storage.close()
     finally:
         if os.path.exists(pcap_path):
             os.remove(pcap_path)

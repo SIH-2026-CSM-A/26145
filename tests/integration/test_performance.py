@@ -27,6 +27,7 @@ async def test_pipeline_end_to_end_performance_benchmark():
         start_time = time.perf_counter()
         alerts = await pipeline.process_pcap(pcap_path)
         end_time = time.perf_counter()
+        await pipeline.storage.close()
 
         processing_time_ms = (end_time - start_time) * 1000.0
         pkt_per_sec = (packet_count / (end_time - start_time)) if (end_time > start_time) else 0.0

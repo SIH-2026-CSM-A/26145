@@ -30,7 +30,12 @@ export default function App() {
       // Append point to throughput timeline
       const nowStr = new Date().toLocaleTimeString();
       setTrafficHistory((prev) => {
-        const next = [...prev, { time: nowStr, pps: m.packets_per_sec || 0, bps: (m.bytes_per_sec || 0) / 1024 }];
+        // null = not measured; the chart shows a gap instead of a fake zero
+        const next = [...prev, {
+          time: nowStr,
+          pps: m.packets_per_sec ?? null,
+          bps: m.bytes_per_sec != null ? m.bytes_per_sec / 1024 : null,
+        }];
         return next.slice(-20);
       });
     }
@@ -109,24 +114,24 @@ export default function App() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <MetricCard
             title="Active Flows"
-            value={metrics.active_flows}
-            unit="tracked"
+            value={metrics.active_flows ?? '—'}
+            unit={metrics.active_flows != null ? 'tracked' : 'not measured'}
             icon={Layers}
             colorClass="bg-blue-50 border-blue-200 text-blue-600"
             subtext="LRU State Engine"
           />
           <MetricCard
             title="Packet Rate"
-            value={metrics.packets_per_sec ? metrics.packets_per_sec.toFixed(1) : "0.0"}
-            unit="PPS"
+            value={metrics.packets_per_sec != null ? metrics.packets_per_sec.toFixed(1) : '—'}
+            unit={metrics.packets_per_sec != null ? 'PPS' : 'not measured'}
             icon={Zap}
             colorClass="bg-emerald-50 border-emerald-200 text-emerald-600"
             subtext="Ingestion Telemetry"
           />
           <MetricCard
             title="Byte Throughput"
-            value={metrics.bytes_per_sec ? (metrics.bytes_per_sec / 1024).toFixed(1) : "0.0"}
-            unit="KB/s"
+            value={metrics.bytes_per_sec != null ? (metrics.bytes_per_sec / 1024).toFixed(1) : '—'}
+            unit={metrics.bytes_per_sec != null ? 'KB/s' : 'not measured'}
             icon={Activity}
             colorClass="bg-purple-50 border-purple-200 text-purple-600"
             subtext="Unidirectional Tap"

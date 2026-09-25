@@ -95,7 +95,7 @@ async def test_publish_alert_and_sse_broadcasting():
         flow={"src_ip": "192.168.1.50", "dst_ip": "10.0.0.53", "dst_port": 53, "protocol": "UDP", "window_start": "2026-09-16T15:00:00Z", "window_end": "2026-09-16T15:00:15Z"},
         confidence=0.95,
         severity="HIGH",
-        evidence={"rule_matches": ["RULE_DNS_TUNNEL_PAYLOAD_DEPTH"], "ml_scores": [], "metrics": {}},
+        detection={"rule_matches": ["RULE_DNS_TUNNEL_PAYLOAD_DEPTH"], "ml_scores": [], "metrics": {}},
         feature_summary={"total_packets": 10, "total_bytes": 1000, "pps": 1.0, "bps": 100.0},
     )
 
@@ -129,3 +129,30 @@ def test_payload_security_boundary_api(client):
     for forbidden_key in ["raw_payload", "payload_bytes", "decrypted_payload", "plaintext_content"]:
         assert forbidden_key not in json_repr
 
+
+
+@pytest.mark.asyncio
+async def test_sse_payload_is_alert_v2():
+    alert = Alert("THREAT_TEST", {}, {"src_ip": "10.0.0.1"}, 0.5, "LOW", {}, {},
+                  flow_id="1:abc=", observability_state="reverse_only")
+    q = broadcaster.subscribe()
+    try:
+        await publish_alert(alert)
+        payload = q.get_nowait()
+    finally:
+        broadcaster.unsubscribe(q)
+        await storage.close()  # module-global connection must not outlive this test's loop
+    assert payload["$schema"].endswith("alert.v2.json")
+    assert payload["observability_state"] == "reverse_only"
+    assert {"flow_id", "evidence", "contract_version", "model_version", "campaign_id",
+            "host_stage", "record_hash", "substitutions"} <= set(payload)
+    json.dumps(payload)  # SSE sends it as JSON
+
+
+def test_metrics_report_only_measured_values(client):
+    data = client.get("/api/v1/metrics").json()
+    # the pipeline is not wired to the API process yet; nothing may be invented
+    assert data["active_flows"] is None
+    assert data["packets_per_sec"] is None and data["bytes_per_sec"] is None
+    assert data["telemetry_source"] == "not_connected"
+    assert isinstance(data["total_alerts"], int)

@@ -69,11 +69,11 @@ export default function EvidenceModal({ alert, onClose }) {
               <Cpu className="w-4 h-4 text-emerald-600" /> Rule Matches & ML Anomaly Evidence
             </h3>
             <div className="space-y-3">
-              {alert.evidence?.rule_matches?.length > 0 && (
+              {alert.detection?.rule_matches?.length > 0 && (
                 <div>
                   <span className="text-[11px] text-slate-500 block mb-1.5 font-mono">Deterministic Rule Triggers:</span>
                   <div className="flex flex-wrap gap-1.5">
-                    {alert.evidence.rule_matches.map((rule, idx) => (
+                    {alert.detection.rule_matches.map((rule, idx) => (
                       <span key={idx} className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-mono px-2.5 py-1 rounded-lg font-semibold">
                         {rule}
                       </span>
@@ -81,13 +81,13 @@ export default function EvidenceModal({ alert, onClose }) {
                   </div>
                 </div>
               )}
-              {alert.evidence?.ml_scores?.length > 0 && (
+              {alert.detection?.ml_scores?.length > 0 && (
                 <div>
                   <span className="text-[11px] text-slate-500 block mb-1.5 font-mono">Classical ML Model Scores:</span>
                   <div className="flex flex-wrap gap-2">
-                    {alert.evidence.ml_scores.map((score, idx) => (
+                    {alert.detection.ml_scores.map((score, idx) => (
                       <span key={idx} className="bg-blue-50 border border-blue-200 text-blue-700 text-xs font-mono px-2.5 py-1 rounded-lg font-semibold">
-                        {score.model}: {score.score?.toFixed(4)} ({score.prediction})
+                        {typeof score === 'number' ? score.toFixed(4) : String(score)}
                       </span>
                     ))}
                   </div>
