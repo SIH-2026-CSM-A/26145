@@ -194,6 +194,15 @@ backpressure never stalls the capture and never hides loss. The flow tracker's i
 flush runs on a timer so idle flows are scored within `idle_timeout` + one tick; together
 with the active timeout this bounds per-flow detection latency.
 
+Implemented in `src/sih26145/streaming.py` (`run_stream`): producer (ingest + flow
+tracking), timer (idle flush + rate sampling), consumer (store, detectors, aggregator,
+storage, publish), one event loop. Paced or live replay drops on a full queue and counts
+it; offline analysis (`process_pcap`, `analyze`) uses a blocking put, i.e. lossless
+backpressure. Flushed flows are enqueued oldest first. Alert latency is measured from a
+flow's flush (enqueue) to its alert being published; the wait from a flow's last packet to
+its flush is bounded separately by `idle_timeout + tick`. When the producer is behind the
+replay clock the timer flushes on ingested event time, so late packets do not split flows.
+
 ## 10. Alert schema v2 (`sih26145.alert.v2`)
 
 ```json
@@ -310,9 +319,9 @@ campaign graph (hosts as nodes, alerts as edges, grouped by `campaign_id`).
 | Detector (f) with ratio / substitute branches | Implemented (ruleset 1.1.0) |
 | Detectors (a)–(e) on tier-2 features | Implemented (ruleset 2.0.0); 12 benign regression captures raise zero alerts |
 | LightGBM / trained IsolationForest | Not started — synthetic-baseline models in place, gated from alerting (AUDIT D1) |
-| Bounded queue + drop counter, idle-flush timer | Not started (AUDIT A7) |
+| Bounded queue + drop counter, idle-flush timer | Implemented (`streaming.py`); drops counted in paced/live replay, lossless in offline analysis |
 | Alert v2 + storage migration + WAL | Implemented |
-| Pipeline → API → SSE wiring | Not started (AUDIT A6) |
+| Pipeline → API → SSE wiring | Implemented: `sih26145 serve` runs both in one process; `/metrics` reads the live pipeline; browser-checked |
 | Dashboard v2 fields | Implemented (evidence, capture visibility, substitutions); browser-checked |
 | Campaign graph, visibility gauge | Not started |
 | Throughput benchmark (flows/s, Mbps) | Not started (AUDIT D5) |

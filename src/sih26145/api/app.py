@@ -48,6 +48,10 @@ import os
 db_env = os.getenv("SIH26145_DB_PATH")
 storage = AlertStorage(db_env if db_env else ":memory:")
 broadcaster = AlertBroadcaster()
+# Set by `sih26145 serve` to the running pipeline's PipelineMetrics; None = nothing running.
+pipeline_metrics = None
+METRIC_FIELDS = ("pipeline_state", "active_flows", "flows_per_sec", "mbps", "packets_per_sec", "rate_window_s",
+                 "queue_depth", "queue_max", "drops", "flows_scored", "link_reverse_visibility_w", "alert_latency_ms")
 
 
 async def publish_alert(alert: Alert) -> str:
@@ -134,17 +138,16 @@ async def get_alert_by_id(
 
 @app.get("/api/v1/metrics")
 async def get_metrics():
-    """Traffic and flow metrics.
+    """Live telemetry from the pipeline running in this process (`sih26145 serve`).
 
-    Only values that are actually measured are returned. The pipeline is not yet wired to
-    this process (AUDIT A6), so flow and rate telemetry is null rather than invented.
+    Rates cover the last ~5 s while running and the whole run once finished
+    (`rate_window_s` says which). Every field is null when no pipeline is attached;
+    `alert_latency_ms` (flush -> alert published) is null until an alert has been raised.
     """
+    snap = pipeline_metrics.snapshot() if pipeline_metrics is not None else dict.fromkeys(METRIC_FIELDS)
     return {
-        "active_flows": None,
-        "packets_per_sec": None,
-        "bytes_per_sec": None,
-        "link_reverse_visibility": None,
-        "telemetry_source": "not_connected",
+        **snap,
+        "telemetry_source": "pipeline" if pipeline_metrics is not None else "not_connected",
         "total_alerts": await storage.count_alerts(),
         "mode": "PASSIVE_READ_ONLY",
     }

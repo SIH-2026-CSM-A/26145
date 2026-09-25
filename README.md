@@ -86,7 +86,17 @@ Generate a synthetic test PCAP covering the threat classes above and run full pi
 uv run python -m sih26145.cli demo
 ```
 
-### 3. Launch FastAPI REST & SSE Services
+### 3. Live replay: pipeline + API + SSE in one process
+Replay a capture at real time (or `--speed N`, or `--unthrottled`) and serve the API from
+the same process; alerts reach the dashboard over SSE as they are produced and
+`/api/v1/metrics` reports the running pipeline (flows/s, Mbps, queue depth, drops, alert
+latency, link visibility):
+```bash
+uv run python -m sih26145.cli demo --output-pcap demo.pcap   # or any capture
+uv run python -m sih26145.cli serve demo.pcap --speed 3 --db alerts.db
+```
+
+### 3b. Launch FastAPI REST & SSE Services (API only, no pipeline)
 Start the backend REST API server with SSE live streaming:
 ```bash
 uv run uvicorn sih26145.api.app:app --host 0.0.0.0 --port 8000

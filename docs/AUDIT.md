@@ -201,8 +201,8 @@ throughput · **AS** structured alert schema · **(a)–(f)** the six threat cla
 | A1–A2 | DDoS / C2 false positives | Fixed: dst-tier DDoS rules, pair-level C2 with poller suppression; regression captures (session 2) |
 | A3 | Exfil false positives | Fixed (direction-aware detector (f)) |
 | A4 | DGA misfires | Fixed: host-tier DGA/tunnel rules with NXDOMAIN when answered; Ramnit DGA scenario (session 2). qtype still dropped (TODO) |
-| A5 | Fake metrics | Fixed (null until wired) |
-| A6–A7 | Not wired; unbounded latency | Open (TODO Now) |
+| A5 | Fake metrics | Fixed: `/metrics` reports the running pipeline; null when none is attached (session 2) |
+| A6–A7 | Not wired; unbounded latency | Fixed: `serve` (pipeline + API + SSE, one process), bounded queue with drop counter, idle-flush timer (session 2) |
 | A8 | Truncated byte counts | Open (TODO Next) |
 | A9 | Direction never measured | Fixed |
 | A10 | Wall-clock timestamps | Fixed |

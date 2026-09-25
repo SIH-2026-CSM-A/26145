@@ -23,7 +23,24 @@ def main():
     demo_parser = subparsers.add_parser("demo", help="Generate synthetic threats PCAP & execute pipeline")
     demo_parser.add_argument("--output-pcap", type=str, default="demo_threats.pcap", help="Output PCAP file path")
 
+    serve_parser = subparsers.add_parser("serve", help="Replay a PCAP through the pipeline and serve API + SSE")
+    serve_parser.add_argument("pcap_file", type=str, help="Capture to replay")
+    pace = serve_parser.add_mutually_exclusive_group()
+    pace.add_argument("--speed", type=float, default=1.0, help="Replay rate as a multiple of real time (default 1.0)")
+    pace.add_argument("--unthrottled", action="store_true", help="Replay as fast as possible")
+    serve_parser.add_argument("--host", default="127.0.0.1")
+    serve_parser.add_argument("--port", type=int, default=8000)
+    serve_parser.add_argument("--db", type=str, default=None, help="SQLite database path (default: in memory)")
+    serve_parser.add_argument("--tick", type=float, default=1.0, help="Idle-flush timer period, seconds")
+
     args = parser.parse_args()
+    if args.command == "serve":
+        import logging
+        from sih26145.serve import serve
+        logging.basicConfig(level=logging.INFO)
+        asyncio.run(serve(args.pcap_file, None if args.unthrottled else args.speed,
+                          args.host, args.port, args.db, args.tick))
+        return
 
     async def run_cli():
         if args.command == "analyze":

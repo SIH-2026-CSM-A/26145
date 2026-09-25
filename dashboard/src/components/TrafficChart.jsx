@@ -9,7 +9,7 @@ export default function TrafficChart({ data }) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-sm font-bold text-slate-900 font-sans">Live Traffic Throughput Timeline</h3>
-          <p className="text-xs text-slate-500 font-medium">Real-time Packets/Sec (PPS) & Byte Throughput (KB/s)</p>
+          <p className="text-xs text-slate-500 font-medium">Scored flows/sec and ingested Mbps</p>
         </div>
         <span className="text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
           3s Polling Rate
@@ -41,8 +41,8 @@ export default function TrafficChart({ data }) {
                 contentStyle={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1', borderRadius: '0.75rem', color: '#0f172a', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
                 itemStyle={{ fontSize: '12px' }}
               />
-              <Area type="monotone" dataKey="pps" name="Packets/Sec (PPS)" stroke="#2563eb" fillOpacity={1} fill="url(#ppsGrad)" strokeWidth={2} />
-              <Area type="monotone" dataKey="bps" name="Byte Rate (KB/s)" stroke="#10b981" fillOpacity={1} fill="url(#bpsGrad)" strokeWidth={2} />
+              <Area type="monotone" dataKey="fps" name="Flows/sec" stroke="#2563eb" fillOpacity={1} fill="url(#ppsGrad)" strokeWidth={2} />
+              <Area type="monotone" dataKey="mbps" name="Mbps" stroke="#10b981" fillOpacity={1} fill="url(#bpsGrad)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         )}

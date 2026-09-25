@@ -5,6 +5,7 @@ import TrafficChart from './components/TrafficChart';
 import ThreatDistChart from './components/ThreatDistChart';
 import DetectionInsightPanel from './components/DetectionInsightPanel';
 import AlertStreamTable from './components/AlertStreamTable';
+import PipelineStatus from './components/PipelineStatus';
 import EvidenceModal from './components/EvidenceModal';
 import { fetchHealth, fetchMetrics, fetchAlerts } from './services/api';
 import { subscribeToAlertStream } from './services/sse';
@@ -12,7 +13,7 @@ import { Activity, ShieldAlert, Zap, Layers, AlertTriangle, AlertOctagon } from 
 
 export default function App() {
   const [health, setHealth] = useState({ status: 'OFFLINE', monitoring: 'DISCONNECTED', active: false });
-  const [metrics, setMetrics] = useState({ active_flows: 0, packets_per_sec: 0, bytes_per_sec: 0, total_alerts: 0 });
+  const [metrics, setMetrics] = useState({ active_flows: null, flows_per_sec: null, mbps: null, total_alerts: 0 });
   const [alerts, setAlerts] = useState([]);
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [modalAlert, setModalAlert] = useState(null);
@@ -27,14 +28,16 @@ export default function App() {
       const m = await fetchMetrics();
       setMetrics(m);
 
-      // Append point to throughput timeline
+      // Append point to throughput timeline -- live-window rates only; a finished run
+      // reports its whole-run average, which is not a point on this timeline
+      if (m.pipeline_state !== 'running') return;
       const nowStr = new Date().toLocaleTimeString();
       setTrafficHistory((prev) => {
         // null = not measured; the chart shows a gap instead of a fake zero
         const next = [...prev, {
           time: nowStr,
-          pps: m.packets_per_sec ?? null,
-          bps: m.bytes_per_sec != null ? m.bytes_per_sec / 1024 : null,
+          fps: m.flows_per_sec ?? null,
+          mbps: m.mbps ?? null,
         }];
         return next.slice(-20);
       });
@@ -121,20 +124,20 @@ export default function App() {
             subtext="LRU State Engine"
           />
           <MetricCard
-            title="Packet Rate"
-            value={metrics.packets_per_sec != null ? metrics.packets_per_sec.toFixed(1) : '—'}
-            unit={metrics.packets_per_sec != null ? 'PPS' : 'not measured'}
+            title="Flow Rate"
+            value={metrics.flows_per_sec != null ? metrics.flows_per_sec.toFixed(1) : '—'}
+            unit={metrics.flows_per_sec != null ? 'flows/s' : 'not measured'}
             icon={Zap}
             colorClass="bg-emerald-50 border-emerald-200 text-emerald-600"
-            subtext="Ingestion Telemetry"
+            subtext={metrics.rate_window_s != null ? `scored, last ${metrics.rate_window_s.toFixed(0)} s` : 'Scored flows'}
           />
           <MetricCard
-            title="Byte Throughput"
-            value={metrics.bytes_per_sec != null ? (metrics.bytes_per_sec / 1024).toFixed(1) : '—'}
-            unit={metrics.bytes_per_sec != null ? 'KB/s' : 'not measured'}
+            title="Throughput"
+            value={metrics.mbps != null ? metrics.mbps.toFixed(2) : '—'}
+            unit={metrics.mbps != null ? 'Mbps' : 'not measured'}
             icon={Activity}
             colorClass="bg-purple-50 border-purple-200 text-purple-600"
-            subtext="Unidirectional Tap"
+            subtext="Ingested wire bytes"
           />
           <MetricCard
             title="Total Detections"
@@ -153,6 +156,8 @@ export default function App() {
             subtext="High Severity Ratio"
           />
         </div>
+
+        <PipelineStatus metrics={metrics} />
 
         {/* Primary Dashboard Grid Row: Timeline, Distribution, & Insight Panel */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

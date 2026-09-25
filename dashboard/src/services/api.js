@@ -18,7 +18,7 @@ export async function fetchMetrics() {
     return await res.json();
   } catch (err) {
     console.error('API Error (metrics):', err);
-    return { active_flows: null, packets_per_sec: null, bytes_per_sec: null, total_alerts: 0, mode: 'OFFLINE' };
+    return { active_flows: null, flows_per_sec: null, mbps: null, total_alerts: 0, mode: 'OFFLINE' };
   }
 }
 

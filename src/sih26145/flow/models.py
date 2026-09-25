@@ -57,6 +57,7 @@ class FlowRecord:
     icmp_type: Optional[int] = None     # of the first packet; used for Community ID
     icmp_code: Optional[int] = None
     fwd_is_responder: bool = False  # first packet looked like a response (see tracker)
+    flushed_at: Optional[float] = field(default=None, compare=False, repr=False)  # wall clock, set by the streaming producer
     syn_ts: Optional[float] = None      # first SYN without ACK
     syn_rev: bool = False
     synack_ts: Optional[float] = None   # first SYN+ACK

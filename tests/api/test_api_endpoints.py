@@ -151,8 +151,9 @@ async def test_sse_payload_is_alert_v2():
 
 def test_metrics_report_only_measured_values(client):
     data = client.get("/api/v1/metrics").json()
-    # the pipeline is not wired to the API process yet; nothing may be invented
-    assert data["active_flows"] is None
-    assert data["packets_per_sec"] is None and data["bytes_per_sec"] is None
+    # no pipeline attached to this process: every telemetry field is null, nothing invented
+    for field in ("active_flows", "flows_per_sec", "mbps", "packets_per_sec", "queue_depth", "drops",
+                  "link_reverse_visibility_w", "alert_latency_ms", "pipeline_state"):
+        assert data[field] is None, field
     assert data["telemetry_source"] == "not_connected"
     assert isinstance(data["total_alerts"], int)
