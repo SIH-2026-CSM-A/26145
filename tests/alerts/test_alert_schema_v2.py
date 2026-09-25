@@ -78,10 +78,14 @@ def test_evidence_rows_keep_baselines_and_only_contract_features():
     assert d["substitutions"][0]["unavailable_on_this_flow"] == "dns_nxdomain_rate"
 
 
-def test_ml_alerts_declare_the_synthetic_model():
+def test_alerts_carrying_ml_scores_declare_the_synthetic_model():
+    """Gated: a synthetic prediction alone raises nothing; attached to a rule alert, the
+    alert's model_version names the synthetic model."""
     pred = MLPrediction("isolation_forest_anomaly_detector", "THREAT_UNSUPERVISED_ANOMALY", -0.2, 0.7, True)
-    (alert,) = aggregate(make_flow(True), [], [pred])
-    assert alert.to_dict()["model_version"] == "ml-synthetic-baseline"
+    assert aggregate(make_flow(True), [], [pred]) == []
+    hit = RuleHit("x", "THREAT_UNSUPERVISED_ANOMALY", "RULE_X", "LOW", 0.5)
+    (alert,) = aggregate(make_flow(True), [hit], [pred])
+    assert alert.to_dict()["model_version"] == f"rules-{RULESET_VERSION}+ml-synthetic-baseline"
 
 
 def test_invalid_observability_state_is_rejected():

@@ -6,7 +6,8 @@ import tracemalloc
 import pytest
 
 from sih26145.contract import UnavailableFeatureError, load_contract
-from sih26145.features.store import _READERS, FeatureStore
+from sih26145.features.store import FeatureStore
+from sih26145.features.store_readers import READERS as _READERS
 from sih26145.features.store_state import StoreConfig
 from sih26145.flow.models import FlowKey, FlowRecord
 

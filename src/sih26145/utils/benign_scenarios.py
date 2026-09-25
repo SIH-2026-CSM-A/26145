@@ -91,10 +91,10 @@ def monitoring_poller() -> Packets:
 def flash_crowd() -> Packets:
     """An internal web server with a steady ~10 sessions/min for 6 min, then 150 distinct
     clients complete sessions within one minute (legitimate surge, not a flood)."""
-    srv, out = "10.30.0.80", []
+    rng, srv, out = random.Random(3), "10.30.0.80", []
     for minute in range(6):
-        for k in range(10):
-            out += _web(T0 + minute * 60 + k * 5, f"10.40.0.{k + 1}", srv, 41000 + minute * 10 + k)
+        for k in range(10):  # independent visit times: ordinary use has no schedule
+            out += _web(T0 + minute * 60 + rng.uniform(0, 58), f"10.40.0.{k + 1}", srv, 41000 + minute * 10 + k)
     for k in range(150):
         out += _web(T0 + 360 + 5 + k * 0.3, f"10.41.{k // 200}.{k % 200 + 1}", srv, 42000 + k)
     return out
@@ -119,14 +119,27 @@ def busy_resolver() -> Packets:
 
 
 def mail_ptr_burst() -> Packets:
-    """A mail server checks 60 connecting IPs with PTR lookups in one minute."""
+    """A mail server checks 60 connecting IPs with PTR lookups in one minute. Lookups follow
+    SMTP connections, so they arrive at random times, not on a clock."""
     rng, mta, res, out = random.Random(11), "10.0.0.25", "10.0.0.53", []
-    for i in range(60):
+    for i, t in enumerate(sorted(T0 + rng.uniform(0, 55) for _ in range(60))):
         ip = [rng.randrange(1, 255) for _ in range(4)]
-        name, t = ".".join(map(str, reversed(ip))) + ".in-addr.arpa", T0 + i * 0.9
+        name = ".".join(map(str, reversed(ip))) + ".in-addr.arpa"
         out.append((t, pkt(mta, res, 30000 + i, 53, "UDP", dns_message(name, qid=i, qtype=dpkt.dns.DNS_PTR))))
         out.append((t + 0.01, pkt(res, mta, 53, 30000 + i, "UDP",
                                   dns_message(name, qid=i, qtype=dpkt.dns.DNS_PTR, response=True))))
+    return out
+
+
+def cdn_heavy_browsing() -> Packets:
+    """A browser resolving 50 distinct CDN-style hostnames (random-looking first labels) while
+    loading pages; every one resolves. Counterexample for the DGA rule's NXDOMAIN branch."""
+    rng, c, r, out = random.Random(5), "192.168.1.27", "10.0.0.53", []
+    alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+    for i, t in enumerate(sorted(T0 + rng.uniform(0, 40) for _ in range(50))):
+        name = "".join(rng.choice(alphabet) for _ in range(14)) + (".cloudfront.net" if i % 2 else ".akamaized.net")
+        out.append((t, pkt(c, r, 54000 + i, 53, "UDP", dns_message(name, qid=i))))
+        out.append((t + 0.01, pkt(r, c, 53, 54000 + i, "UDP", dns_message(name, qid=i, response=True))))
     return out
 
 
@@ -142,6 +155,7 @@ BENIGN_SCENARIOS: Dict[str, Callable[[], Packets]] = {
     "flash_crowd": flash_crowd,
     "busy_resolver": busy_resolver,
     "mail_ptr_burst": mail_ptr_burst,
+    "cdn_heavy_browsing": cdn_heavy_browsing,
 }
 
 

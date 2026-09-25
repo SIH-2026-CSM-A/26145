@@ -27,3 +27,19 @@ class DetectionContext:
         if self.policy.is_internal(key.src_ip):
             return key.src_ip, key.dst_ip
         return key.dst_ip, key.src_ip
+
+    @property
+    def src(self) -> str:
+        return self.flow.flow_key.src_ip
+
+    @property
+    def dst(self) -> str:
+        return self.flow.flow_key.dst_ip
+
+    @property
+    def pair(self):
+        return (self.src, self.dst)
+
+    def dns_client(self) -> str:
+        """The endpoint that asked: the flow's responder side is the resolver."""
+        return self.dst if self.flow.fwd_is_responder else self.src

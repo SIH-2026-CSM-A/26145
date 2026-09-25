@@ -22,8 +22,28 @@ The system operates strictly under **PASSIVE READ-ONLY MONITORING** semantics:
 
 ## 🎯 Threat Classes (mapped to PS 26145)
 
-| PS | Alert class | Detector |
-|---|---|---|
+| PS | Alert class | Detector | Evidence (tier-2 features, windowed) |
+|---|---|---|---|
+| (a) Volumetric / protocol DDoS | `THREAT_DDOS_VOLUME` | `ddos_volume_detector` | SYN flood: distinct sources, source-IP entropy, SYN-only ratio per destination. UDP reflection/amplification: unsolicited flows from reflector ports (53, 123, 1900, 11211, 389, 19, 161, 111), their mean packet size and bytes. Few-source floods: bytes/flows vs the destination's own EWMA baseline |
+| (b) C2 beaconing | `THREAT_C2_BEACON` | `c2_beacon_detector` | Inter-flow interval CV per (src, dst) over >= 8 gaps; pollers suppressed by periodic fan-out and `config/poller_allowlist.txt` |
+| (c) DGA and DNS tunnelling | `THREAT_DNS_DGA`, `THREAT_DNS_TUNNEL` | `dga_lexical_detector`, `dns_tunnel_detector` | Distinct high-entropy qnames per host + NXDOMAIN rate when resolver answers were captured; query volume and mean qname length |
+| (d) Malware in encrypted sessions (TLS metadata) | `THREAT_ENCRYPTED_ANOMALY` | `encrypted_anomaly_detector` | JA4 on `config/ja4_known_bad.txt` (ships empty); JA4 seen almost only on one pair, used for repeated small, short sessions. No port rule |
+| (e) Recon and port scanning | `THREAT_RECON_PORTSCAN` | `recon_portscan_detector` | Distinct destinations/ports per source with SYN-only ratio; shared infrastructure (high fan-in) skipped |
+| (f) Data exfiltration | `THREAT_EXFILTRATION` | `exfiltration_detector` | Outbound/inbound ratio when both halves are captured; otherwise egress z-score + destination rarity + off-hours, named as a substitution |
+
+The IsolationForest and RandomForest are fitted on synthetic vectors. Until they are trained
+on labelled captures their scores are attached to rule alerts but **never create an alert**.
+
+**Known weaknesses** (also stated per detector in `src/sih26145/feature_contract.toml`):
+- (a) the few-source volumetric rule needs 5 closed windows of per-destination baseline (warm-up).
+- (c) **dictionary DGAs** (word-based names) have ordinary label entropy and are **not caught**.
+  Without resolver responses in the capture, a host resolving many CDN-style names can reach
+  the lexical threshold.
+- (b) beacons with more than ~50% jitter; (d) a single-user client with an enclave-unique
+  fingerprint reconnecting often to one server; (e) full-handshake connect scans.
+- Thresholds are hand-set on generated captures, not tuned on real traffic.
+
+---|---|---|
 | (a) Volumetric / protocol DDoS | `THREAT_DDOS_VOLUME` | `ddos_volume_detector` |
 | (b) C2 beaconing | `THREAT_C2_BEACON` | `c2_beacon_detector` |
 | (c) DGA and DNS tunnelling | `THREAT_DNS_DGA`, `THREAT_DNS_TUNNEL` | `dga_lexical_detector`, `dns_tunnel_detector` |

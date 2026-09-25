@@ -1,0 +1,4 @@
+# Known-bad JA4 client fingerprints, one per line (e.g. t13d191000_9dc949149365_e7c285222651).
+# Shipped empty on purpose. Entries come from vetted threat intelligence -- the FoxIO
+# JA4+ database, a CERT-In/NCIIPC advisory, or an internal incident -- and are added by an
+# analyst who can cite the source. Override the path with SIH26145_JA4_KNOWN_BAD.

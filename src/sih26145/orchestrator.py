@@ -28,6 +28,7 @@ class ThreatDetectionPipeline:
         self.storage = AlertStorage(db_path)
         self.policy = NetworkPolicy.from_env()
         self.feature_store = FeatureStore(policy=self.policy)
+        self.flush_tick = 1.0  # seconds of event time between idle-flow sweeps
 
     async def init(self):
         """Initialize pipeline storage."""
@@ -39,20 +40,24 @@ class ThreatDetectionPipeline:
         reader = PcapReader(pcap_path)
         generated_alerts: List[Alert] = []
 
-        last_pkt_time = 0.0
+        last_pkt_time = last_flush = None
         for pkt in reader:
             if pkt is None:
                 continue
             last_pkt_time = pkt.timestamp
             for flow in self.flow_tracker.process_packet(pkt):
                 await self._score(flow, alert_queue, generated_alerts)
+            if last_flush is None or last_pkt_time - last_flush >= self.flush_tick:
+                # idle flows are scored as event time passes, oldest first, so per-pair
+                # inter-flow gaps arrive in order
+                for flow in sorted(self.flow_tracker.flush_expired(last_pkt_time), key=lambda f: f.start_time):
+                    await self._score(flow, alert_queue, generated_alerts)
+                last_flush = last_pkt_time
 
-        # Flush all remaining active flows at the end of PCAP
-        remaining_flows = self.flow_tracker.flush_expired(last_pkt_time + 100.0)
-        for flow in list(self.flow_tracker._active_flows.values()):
-            if flow not in remaining_flows:
-                remaining_flows.append(flow)
-        for flow in remaining_flows:
+        # End of capture: score everything still active, oldest first
+        remaining = list(self.flow_tracker._active_flows.values())
+        self.flow_tracker._active_flows.clear()
+        for flow in sorted(remaining, key=lambda f: f.start_time):
             await self._score(flow, alert_queue, generated_alerts)
 
         return generated_alerts

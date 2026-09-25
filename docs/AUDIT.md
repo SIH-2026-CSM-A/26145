@@ -192,15 +192,15 @@ throughput · **AS** structured alert schema · **(a)–(f)** the six threat cla
 
 | ID | Area | Status at end of session (2026-09-25) |
 |---|---|---|
-| D1 | ML fitted on dummy vectors | Open (TODO Next); alerts now say `ml-synthetic-baseline` |
-| D2 | No windowed state | Store built and fed; detectors (a)–(e) not yet rewired (TODO Now) |
-| D3 | No JA3/JA4 | JA3/JA4/JA3S computed; detector (d) not yet rewired |
-| D4 | Recon on failed connections | Features built; detector (e) not yet rewired |
+| D1 | ML fitted on dummy vectors | Open (TODO Next); gated since session 2: ML scores attach to rule alerts, never create one |
+| D2 | No windowed state | Fixed: all seven detectors read the store (session 2) |
+| D3 | No JA3/JA4 | Fixed: detector (d) uses JA4 rarity + known-bad list, no port rule (session 2) |
+| D4 | Recon on failed connections | Fixed: fan-out + SYN-only ratio; `failed_tcp` regression capture (session 2) |
 | D5 | Benchmark pps, inflated 50× | Open (TODO Now) |
 | D6 | Taxonomy mismatch | Fixed |
-| A1–A2 | DDoS / C2 false positives | Features built; detectors not yet rewired |
+| A1–A2 | DDoS / C2 false positives | Fixed: dst-tier DDoS rules, pair-level C2 with poller suppression; regression captures (session 2) |
 | A3 | Exfil false positives | Fixed (direction-aware detector (f)) |
-| A4 | DGA misfires | Features built; detector not yet rewired |
+| A4 | DGA misfires | Fixed: host-tier DGA/tunnel rules with NXDOMAIN when answered; Ramnit DGA scenario (session 2). qtype still dropped (TODO) |
 | A5 | Fake metrics | Fixed (null until wired) |
 | A6–A7 | Not wired; unbounded latency | Open (TODO Now) |
 | A8 | Truncated byte counts | Open (TODO Next) |

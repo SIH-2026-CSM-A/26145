@@ -14,16 +14,18 @@ from typing import Any, Optional
 
 import numpy as np
 
-from sih26145.contract import UnavailableFeatureError, load_contract
+from sih26145.contract import load_contract
 from sih26145.features.directional import NetworkPolicy, egress_bytes
 from sih26145.features.extractor import entropy_of_string
-from sih26145.features.sketches import CountMinSketch, bucket_entropy, bucket_of, hll_add, hll_count
+from sih26145.features.sketches import CountMinSketch, bucket_of, hll_add
 from sih26145.features.store_state import (
-    D_BYTES, D_FLOWS, D_SYN_ONLY, D_TCP, ENTRY_OVERHEAD, H_DNS_NX, H_DNS_Q, H_DNS_RESP,
-    H_DNS_RESP_FLOWS, H_FLOWS, H_HIGH_ENT, H_QLEN, H_SYN_ONLY, H_TCP, HLL_DSTS, HLL_JA4,
-    HLL_PORTS, HLL_QNAMES, PAIR_OVERHEAD, StoreConfig, _Dst, _Host, _lru_get, _Pair, _roll,
+    D_BYTES, D_FLOWS, D_REFL_BYTES, D_REFL_FLOWS, D_REFL_PKTS, D_SYN_ONLY, D_TCP, ENTRY_OVERHEAD,
+    H_DNS_NX, H_DNS_Q, H_DNS_RESP, H_DNS_RESP_FLOWS, H_FLOWS, H_HIGH_ENT, H_QLEN, H_SYN_ONLY, H_TCP,
+    HLL_DSTS, HLL_JA4, HLL_PERIODIC, HLL_PORTS, HLL_QNAMES, PAIR_OVERHEAD, REFLECTOR_PORTS, StoreConfig,
+    _Dst, _Host, _LinkView, _lru_get, _Pair, _roll,
 )
 from sih26145.flow.models import FlowRecord
+from sih26145.features.store_readers import READERS
 
 _SYN, _ACK = 0x02, 0x10
 
@@ -79,9 +81,8 @@ class FeatureStore:
             egress_host = self._host(inside, t)
             egress_host.egress[int(t // cfg.egress_bucket) % cfg.egress_buckets] += out
 
-        dst = _lru_get(self.dsts, key.dst_ip, cfg.max_dsts, lambda: _Dst(cfg, wid))
-        _roll(dst, wid, dst.counts, dst.hll, dst.ent)
-        dst.counts[0] += (1, flow.total_bytes, tcp, syn_only)
+        dst = self._dst(key.dst_ip, wid)
+        dst.counts[0, [D_FLOWS, D_BYTES, D_TCP, D_SYN_ONLY]] += (1, flow.total_bytes, tcp, syn_only)
         hll_add(dst.hll[0], key.src_ip)
         hll_add(dst.longterm, key.src_ip)
         dst.ent[0, bucket_of(key.src_ip, cfg.entropy_buckets)] += 1
@@ -97,9 +98,51 @@ class FeatureStore:
             delta = gap - pair.mean
             pair.mean += delta / pair.n
             pair.m2 += delta * (gap - pair.mean)
+            if pair.n >= cfg.periodic_min_gaps and pair.mean > 0 and \
+                    math.sqrt(pair.m2 / (pair.n - 1)) / pair.mean <= cfg.periodic_cv:
+                hll_add(host.hll[0, HLL_PERIODIC], key.dst_ip)
         pair.last_start = flow.start_time if pair.last_start is None else max(pair.last_start, flow.start_time)
         self.pair_history.add(f"{key.src_ip}|{key.dst_ip}")
+        self._reflection(flow, wid)
         self._decay(t)
+
+    def _reflection(self, flow: FlowRecord, wid: int) -> None:
+        """UDP from a reflector port toward an endpoint that sent nothing on that 5-tuple:
+        the endpoint never asked, so the traffic is unsolicited (reflection/amplification)."""
+        key = flow.flow_key
+        if key.protocol != "UDP":
+            return
+        if key.src_port in REFLECTOR_PORTS:
+            victim, victim_pkts, refl_pkts, refl_bytes = key.dst_ip, flow.rev_packets, flow.fwd_packets, flow.fwd_bytes
+        elif key.dst_port in REFLECTOR_PORTS:
+            victim, victim_pkts, refl_pkts, refl_bytes = key.src_ip, flow.fwd_packets, flow.rev_packets, flow.rev_bytes
+        else:
+            return
+        if victim_pkts or not refl_pkts:
+            return  # the endpoint initiated or answered on this 5-tuple: solicited
+        dst = self._dst(victim, wid)
+        dst.counts[0, [D_REFL_FLOWS, D_REFL_BYTES, D_REFL_PKTS]] += (1, refl_bytes, refl_pkts)
+
+    def _dst(self, ip: str, wid: int) -> _Dst:
+        cfg = self.cfg
+        dst = _lru_get(self.dsts, ip, cfg.max_dsts, lambda: _Dst(cfg, wid))
+        self._roll_dst(dst, wid)
+        return dst
+
+    def _roll_dst(self, dst: _Dst, wid: int) -> None:
+        """Close finished windows into the destination's EWMA baseline, then roll."""
+        if wid <= dst.wid:
+            return
+        a = self.cfg.ewma_alpha
+        skipped = min(wid - dst.wid - 1, self.cfg.egress_buckets)  # silent windows count as zero
+        for flows, nbytes in [tuple(dst.counts[0, [D_FLOWS, D_BYTES]])] + [(0.0, 0.0)] * skipped:
+            if dst.base_n == 0:
+                dst.base_flows, dst.base_bytes = flows, nbytes
+            else:
+                dst.base_flows += a * (flows - dst.base_flows)
+                dst.base_bytes += a * (nbytes - dst.base_bytes)
+            dst.base_n += 1
+        _roll(dst, wid, dst.counts, dst.hll, dst.ent)
 
     def _dns(self, flow: FlowRecord, t: float, wid: int) -> None:
         if not flow.dns_queries and not flow.dns_responses:
@@ -157,9 +200,9 @@ class FeatureStore:
         """Contract-checked read. `key`: host IP, dst IP, (src, dst) pair, JA4, or epoch
         seconds for off_hours; None for link features."""
         load_contract().require(feature)
-        if feature not in _READERS:
+        if feature not in READERS:
             raise KeyError(f"{feature!r} is not served by the FeatureStore")
-        return _READERS[feature](self, key)
+        return READERS[feature](self, key)
 
     def off_hours(self, t: float) -> bool:
         local = datetime.fromtimestamp(t, tz=timezone(timedelta(hours=self.cfg.utc_offset_hours)))
@@ -176,7 +219,7 @@ class FeatureStore:
     def _dst_view(self, ip: str) -> Optional[_Dst]:
         dst = self.dsts.get(ip)
         if dst is not None:
-            _roll(dst, int(self.now // self.cfg.window), dst.counts, dst.hll, dst.ent)
+            self._roll_dst(dst, int(self.now // self.cfg.window))
         return dst
 
     def _pair_view(self, pair_key) -> Optional[_Pair]:
@@ -190,111 +233,7 @@ class FeatureStore:
     def memory_ceiling_bytes(self) -> int:
         """Upper bound on store memory for this configuration, at full occupancy."""
         cfg, m = self.cfg, 1 << self.cfg.hll_p
-        host = 2 * 9 * 8 + 2 * 4 * m + cfg.egress_buckets * 8 + ENTRY_OVERHEAD
-        dst = 2 * 4 * 8 + 2 * m + 2 * cfg.entropy_buckets * 4 + m + ENTRY_OVERHEAD
+        host = 2 * 9 * 8 + 2 * 5 * m + cfg.egress_buckets * 8 + ENTRY_OVERHEAD
+        dst = 2 * 7 * 8 + 2 * m + 2 * cfg.entropy_buckets * 4 + m + ENTRY_OVERHEAD
         sketches = self.pair_history.nbytes + self.ja4_seen.nbytes + self.link.nbytes
         return cfg.max_hosts * host + cfg.max_dsts * dst + cfg.max_pairs * PAIR_OVERHEAD + sketches
-
-
-class _LinkView:
-    def __init__(self, store: FeatureStore):
-        self.store = store
-
-    def roll(self, wid: int) -> None:
-        s = self.store
-        if wid > s.link_wid:
-            s.link[1] = s.link[0] if wid == s.link_wid + 1 else 0
-            s.link[0] = 0
-            s.link_wid = wid
-
-
-def _hc(i):
-    return lambda s, ip: float(h.counts[:, i].sum()) if (h := s._host_view(ip)) else 0.0
-
-
-def _hll_host(row):
-    return lambda s, ip: hll_count(np.maximum(h.hll[0, row], h.hll[1, row])) if (h := s._host_view(ip)) else 0.0
-
-
-def _ratio(num, den):
-    return lambda s, ip: (float(h.counts[:, num].sum() / d) if (h := s._host_view(ip)) is not None
-                          and (d := h.counts[:, den].sum()) else None)
-
-
-def _nxdomain_rate(s: FeatureStore, ip: str) -> Optional[float]:
-    h = s._host_view(ip)
-    if h is None or not h.counts[:, H_DNS_RESP_FLOWS].sum():
-        raise UnavailableFeatureError("src_nxdomain_rate_w: no resolver responses observed for this host in the window")
-    resp = h.counts[:, H_DNS_RESP].sum()
-    return float(h.counts[:, H_DNS_NX].sum() / resp) if resp else None
-
-
-def _egress(minutes: int):
-    def read(s: FeatureStore, ip: str) -> float:
-        h = s._host_view(ip)
-        if h is None:
-            return 0.0
-        B, bid = s.cfg.egress_buckets, h.egress_bid
-        return float(sum(h.egress[(bid - i) % B] for i in range(min(minutes, B))))
-    return read
-
-
-def _egress_z(s: FeatureStore, ip: str) -> Optional[float]:
-    """Current 1-minute egress vs the host's EWMA baseline; None until warmed up."""
-    h = s._host_view(ip)
-    if h is None or h.baseline_n < s.cfg.min_baseline_buckets:
-        return None
-    current = h.egress[h.egress_bid % s.cfg.egress_buckets]
-    # ponytail: std floored at 10% of the mean (and 1 byte) so a perfectly steady baseline
-    # does not turn a small wobble into a huge z; tune if hosts are bursty by nature.
-    return float((current - h.mean) / max(math.sqrt(h.var), 0.1 * h.mean, 1.0))
-
-
-def _dc(i):
-    return lambda s, ip: float(d.counts[:, i].sum()) if (d := s._dst_view(ip)) else 0.0
-
-
-def _pair_iat_cv(s: FeatureStore, k) -> Optional[float]:
-    p = s._pair_view(k)
-    if p is None or p.n < 2 or p.mean <= 0:
-        return None
-    return math.sqrt(p.m2 / (p.n - 1)) / p.mean
-
-
-def _visibility(s: FeatureStore, _key) -> Optional[float]:
-    _LinkView(s).roll(int(s.now // s.cfg.window))
-    flows = s.link[:, 0].sum()
-    return float(s.link[:, 1].sum() / flows) if flows else None
-
-
-_READERS = {
-    "src_flows_w": _hc(H_FLOWS),
-    "src_distinct_dsts_w": _hll_host(HLL_DSTS),
-    "src_distinct_dst_ports_w": _hll_host(HLL_PORTS),
-    "src_syn_only_ratio_w": _ratio(H_SYN_ONLY, H_TCP),
-    "src_dns_queries_w": _hc(H_DNS_Q),
-    "src_distinct_qnames_w": _hll_host(HLL_QNAMES),
-    "src_high_entropy_qnames_w": _hc(H_HIGH_ENT),
-    "src_qname_len_sum_w": _hc(H_QLEN),
-    "src_nxdomain_rate_w": _nxdomain_rate,
-    "src_distinct_ja4_w": _hll_host(HLL_JA4),
-    "src_egress_bytes_1m": _egress(1),
-    "src_egress_bytes_5m": _egress(5),
-    "src_egress_bytes_1h": _egress(60),
-    "src_egress_bytes_z": _egress_z,
-    "dst_flows_w": _dc(D_FLOWS),
-    "dst_bytes_w": _dc(D_BYTES),
-    "dst_distinct_srcs_w": lambda s, ip: hll_count(np.maximum(d.hll[0], d.hll[1])) if (d := s._dst_view(ip)) else 0.0,
-    "dst_src_ip_entropy_w": lambda s, ip: bucket_entropy(d.ent.sum(axis=0)) if (d := s._dst_view(ip)) else 0.0,
-    "dst_syn_only_ratio_w": lambda s, ip: (float(d.counts[:, D_SYN_ONLY].sum() / t)
-                                           if (d := s._dst_view(ip)) is not None and (t := d.counts[:, D_TCP].sum()) else None),
-    "dst_distinct_srcs_longterm": lambda s, ip: hll_count(d.longterm) if (d := s._dst_view(ip)) else 0.0,
-    "pair_flows_w": lambda s, k: float(sum(p.flows)) if (p := s._pair_view(k)) else 0.0,
-    "pair_iat_mean": lambda s, k: p.mean if (p := s._pair_view(k)) and p.n else None,
-    "pair_iat_cv": _pair_iat_cv,
-    "pair_iat_n": lambda s, k: p.n if (p := s._pair_view(k)) else 0,
-    "pair_history_count": lambda s, k: s.pair_history.estimate(f"{k[0]}|{k[1]}"),
-    "ja4_prevalence": lambda s, ja4: s.ja4_seen.estimate(ja4),
-    "off_hours": lambda s, t: s.off_hours(t),
-    "link_reverse_visibility_w": _visibility,
-}

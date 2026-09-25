@@ -15,7 +15,7 @@
 # tests/contract/ checks their source code against these declarations.
 # Changing a row or a consumer's reads = bump contract_version.
 
-contract_version = "1.0.1"
+contract_version = "1.1.0"
 
 features = [
   # ---- Tier 1: per-flow FeatureVector ------------------------------------------------------
@@ -72,6 +72,7 @@ features = [
   { name = "src_qname_len_sum_w",       state = "computable", tier = "host", approx = "exact",    sources = ["dpkt", "zeek"], reason = "Total characters queried: a volume proxy for DNS tunnelling." },
   { name = "src_nxdomain_rate_w",       state = "reverse_dependent", tier = "host", approx = "exact", sources = ["dpkt", "zeek"], reason = "NXDOMAIN share of resolver responses to this client. Computed whenever resolver responses were captured, including a responses-only capture; raises UnavailableFeatureError when none were." },
   { name = "src_distinct_ja4_w",        state = "degraded",   tier = "host", approx = "hll",      sources = ["dpkt", "zeek"], reason = "Distinct JA4 client fingerprints; needs the client half." },
+  { name = "src_periodic_dsts_w",       state = "computable", tier = "host", approx = "hll",      sources = ["dpkt", "zeek"], reason = "Distinct destinations this host contacts at a regular interval (pair inter-flow CV <= 0.35 over >= 3 gaps). A beacon has one or two; a poller has dozens." },
   { name = "src_egress_bytes_1m",       state = "degraded",   tier = "host", approx = "exact",    sources = ["dpkt", "zeek"], reason = "Internal->external bytes from this host in the current minute. Counts only captured halves: a capture holding only inbound halves sees no egress." },
   { name = "src_egress_bytes_5m",       state = "degraded",   tier = "host", approx = "exact",    sources = ["dpkt", "zeek"], reason = "As src_egress_bytes_1m, last 5 one-minute buckets." },
   { name = "src_egress_bytes_1h",       state = "degraded",   tier = "host", approx = "exact",    sources = ["dpkt", "zeek"], reason = "As src_egress_bytes_1m, last 60 one-minute buckets." },
@@ -82,6 +83,11 @@ features = [
   { name = "dst_distinct_srcs_w",       state = "computable", tier = "dst",  approx = "hll",      sources = ["dpkt", "zeek"], reason = "Fan-in: distinct sources toward this destination." },
   { name = "dst_src_ip_entropy_w",      state = "computable", tier = "dst",  approx = "bucketed", sources = ["dpkt", "zeek"], reason = "Entropy of source IPs toward this destination over 128 hash buckets; saturates at 7 bits, collisions bias low." },
   { name = "dst_syn_only_ratio_w",      state = "degraded",   tier = "dst",  approx = "exact",    sources = ["dpkt", "zeek"], reason = "As src_syn_only_ratio_w, per destination (SYN-flood signal)." },
+  { name = "dst_reflector_flows_w",     state = "degraded",   tier = "dst",  approx = "exact",    sources = ["dpkt", "zeek"], reason = "UDP flows toward this endpoint from a reflector source port (53, 123, 1900, 11211, 389, 19, 161, 111) on which the endpoint sent nothing: unsolicited. Needs the endpoint's own half to prove a response was solicited, so on a capture holding only inbound halves genuine answers are counted too." },
+  { name = "dst_reflector_bytes_w",     state = "degraded",   tier = "dst",  approx = "exact",    sources = ["dpkt", "zeek"], reason = "Bytes sent by the reflectors in dst_reflector_flows_w; same capture caveat." },
+  { name = "dst_reflector_mean_pkt_w",  state = "degraded",   tier = "dst",  approx = "exact",    sources = ["dpkt"],         reason = "Mean packet size sent by those reflectors (amplified responses are large); same capture caveat. Null when there are none." },
+  { name = "dst_bytes_vs_baseline",     state = "computable", tier = "dst",  approx = "ewma",     sources = ["dpkt", "zeek"], reason = "Current-window bytes toward this destination / its EWMA of past window totals (silent windows count as zero). Null until 5 windows have closed: the baseline needs warm-up." },
+  { name = "dst_flows_vs_baseline",     state = "computable", tier = "dst",  approx = "ewma",     sources = ["dpkt", "zeek"], reason = "As dst_bytes_vs_baseline, for flow counts." },
   { name = "dst_distinct_srcs_longterm", state = "computable", tier = "dst", approx = "hll",      sources = ["dpkt", "zeek"], reason = "Distinct sources ever seen toward this destination while tracked (rarity). Includes the current flow: 1 = only this source." },
   { name = "pair_flows_w",              state = "computable", tier = "pair", approx = "exact",    sources = ["dpkt", "zeek"], reason = "Flows from src to dst." },
   { name = "pair_iat_mean",             state = "computable", tier = "pair", approx = "exact",    sources = ["dpkt", "zeek"], reason = "Mean gap between successive flow starts src->dst (Welford)." },
@@ -111,33 +117,41 @@ features = [
 
 [consumers.ddos_volume_detector]
 ps_class = "a"
-max_state = "computable"
-reads = ["pps", "bps", "burstiness_ratio", "total_packets"]
+max_state = "degraded"
+reads = ["dst_distinct_srcs_w", "dst_src_ip_entropy_w", "dst_syn_only_ratio_w",
+         "dst_reflector_flows_w", "dst_reflector_bytes_w", "dst_reflector_mean_pkt_w",
+         "dst_bytes_vs_baseline", "dst_flows_vs_baseline", "dst_bytes_w", "dst_flows_w"]
+weakness = "The volumetric rule needs 5 closed windows of per-destination baseline before it can fire (warm-up)."
 
 [consumers.c2_beacon_detector]
 ps_class = "b"
 max_state = "computable"
-reads = ["total_packets", "duration", "iat_var", "pps", "iat_mean"]
+reads = ["pair_iat_n", "pair_iat_cv", "pair_iat_mean", "src_periodic_dsts_w"]
+weakness = "Beacons with jitter above ~50% (CV > 0.35) and pollers slower than the windowed periodic-destination signature can see; the latter belong on the poller allowlist."
 
 [consumers.dga_lexical_detector]
 ps_class = "c"
-max_state = "computable"
-reads = ["is_udp", "dst_port", "dns_max_domain_entropy", "dns_query_count"]
+max_state = "reverse_dependent"
+reads = ["dns_query_count", "src_high_entropy_qnames_w", "src_distinct_qnames_w", "src_nxdomain_rate_w"]
+weakness = "Dictionary DGAs (word-based names) have ordinary label entropy and are not caught. Without resolver responses, a host resolving many CDN-style names can reach the lexical threshold."
 
 [consumers.dns_tunnel_detector]
 ps_class = "c"
 max_state = "computable"
-reads = ["dst_port", "dns_max_subdomain_depth", "dns_query_count", "dns_max_domain_entropy"]
+reads = ["dns_query_count", "src_dns_queries_w", "src_qname_len_sum_w"]
+weakness = "Low-and-slow tunnels under 50 queries per window, or with short labels, are not caught."
 
 [consumers.encrypted_anomaly_detector]
 ps_class = "d"
 max_state = "degraded"
-reads = ["tls_client_hello_count", "tls_max_sni_entropy", "dst_port", "tls_max_sni_length"]
+reads = ["tls_ja4", "ja4_prevalence", "pair_history_count", "pair_flows_w", "total_bytes", "duration"]
+weakness = "A single-user client with a fingerprint unique to the enclave, reconnecting often to one server, looks the same as a rare-fingerprint beacon; the known-bad list ships empty."
 
 [consumers.recon_portscan_detector]
 ps_class = "e"
-max_state = "computable"
-reads = ["is_tcp", "small_pkt_ratio", "total_packets", "duration"]
+max_state = "degraded"
+reads = ["is_tcp", "src_distinct_dsts_w", "src_distinct_dst_ports_w", "src_syn_only_ratio_w", "dst_distinct_srcs_w"]
+weakness = "Connect scans that complete the handshake are not SYN-only; scans slower than 20 targets per window are not caught."
 
 [consumers.exfiltration_detector]
 ps_class = "f"

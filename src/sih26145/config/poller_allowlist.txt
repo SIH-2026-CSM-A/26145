@@ -1,0 +1,3 @@
+# Known pollers: sources whose periodic connections are expected (monitoring, backup,
+# config management). One IP or CIDR per line. Suppresses C2 beacon alerts from these
+# sources only. Override the path with SIH26145_POLLER_ALLOWLIST.

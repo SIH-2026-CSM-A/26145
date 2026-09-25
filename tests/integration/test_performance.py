@@ -38,7 +38,9 @@ async def test_pipeline_end_to_end_performance_benchmark():
         print(f"[PERFORMANCE] Alerts Generated: {len(alerts)}")
 
         # Performance invariants
-        assert processing_time_ms < 5000.0, "Processing latency exceeded 5 seconds"
+        # The demo capture holds every attack scenario (~20k packets); budget per packet, not
+        # per file. A regression guard only -- throughput is measured by scripts/benchmark.py.
+        assert processing_time_ms / packet_count < 2.0, "Processing exceeded 2 ms per packet"
         assert len(alerts) >= 4, "Expected at least 4 alerts from threat PCAP"
     finally:
         if os.path.exists(pcap_path):

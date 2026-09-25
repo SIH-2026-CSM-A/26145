@@ -175,6 +175,16 @@ only contract-declared features.
 | — | `THREAT_UNSUPERVISED_ANOMALY` | IsolationForest score (flow) |
 
 Detectors take `detect(fv, ctx)`; `ctx` carries the flow, the store and the network policy.
+Rules (a)–(e) read tier-2 store features only (ruleset 2.0.0, contract 1.1.0); each hit names
+an entity (destination, host or pair) and the suite raises one alert per (detector, entity)
+per 300 s of event time. Thresholds are hand-set; see the README for known weaknesses.
+
+**ML gate.** The RandomForest and IsolationForest are still fitted on synthetic vectors (AUDIT
+D1). `EvidenceAggregator(ml_can_alert=...)` defaults to false while `ML_MODEL_VERSION` is
+`synthetic-baseline`: an ML prediction never creates an alert and never changes a rule
+alert's confidence or severity; its score is attached to a rule alert of the same class and
+the alert's `model_version` names the synthetic model. The gate opens when trained models
+ship with a new version string.
 
 ## 9. Streaming and backpressure
 
@@ -294,12 +304,12 @@ campaign graph (hosts as nodes, alerts as edges, grouped by `campaign_id`).
 |---|---|
 | dpkt ingest, flow tracker with bidirectional matching, observability_state | Implemented |
 | Zeek adapter | Not started |
-| Feature contract + tier enforcement test | Implemented (contract 1.0.0) |
+| Feature contract + tier enforcement test | Implemented (contract 1.1.0) |
 | FeatureStore (tier 2) with sketches | Implemented; fed by the orchestrator for every flushed flow |
 | JA3 / JA4 / JA3S | Implemented (dpkt path); JA4 verified against the FoxIO published example |
 | Detector (f) with ratio / substitute branches | Implemented (ruleset 1.1.0) |
-| Detectors (a)–(e) on tier-2 features | Not started — still the per-flow baseline rules (AUDIT A1–A4) |
-| LightGBM / trained IsolationForest | Not started — synthetic-baseline models in place (AUDIT D1) |
+| Detectors (a)–(e) on tier-2 features | Implemented (ruleset 2.0.0); 12 benign regression captures raise zero alerts |
+| LightGBM / trained IsolationForest | Not started — synthetic-baseline models in place, gated from alerting (AUDIT D1) |
 | Bounded queue + drop counter, idle-flush timer | Not started (AUDIT A7) |
 | Alert v2 + storage migration + WAL | Implemented |
 | Pipeline → API → SSE wiring | Not started (AUDIT A6) |

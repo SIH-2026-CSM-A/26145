@@ -34,6 +34,7 @@ class Consumer:
     ps_class: str
     max_state: str
     reads: Tuple[str, ...]
+    weakness: str = ""  # known blind spot, stated in the contract rather than hidden
 
 
 class FeatureContract:
@@ -104,7 +105,8 @@ def parse_contract(data: dict) -> FeatureContract:
             substitutes=tuple(row.get("substitutes", ())),
         )
     consumers = {
-        name: Consumer(name=name, ps_class=c["ps_class"], max_state=c["max_state"], reads=tuple(c["reads"]))
+        name: Consumer(name=name, ps_class=c["ps_class"], max_state=c["max_state"], reads=tuple(c["reads"]),
+                       weakness=c.get("weakness", ""))
         for name, c in data.get("consumers", {}).items()
     }
     return FeatureContract(data["contract_version"], features, consumers)

@@ -110,7 +110,7 @@ def test_evidence_aggregation_ml_only():
         )
     ]
     
-    aggregator = EvidenceAggregator()
+    aggregator = EvidenceAggregator(ml_can_alert=True)  # the path a trained model will take
     alerts = aggregator.aggregate(flow, fv, [], ml_preds)
     assert len(alerts) == 1
     assert alerts[0].detector["type"] == "ML"
@@ -144,7 +144,7 @@ def test_evidence_aggregation_hybrid_uninvented_fused_confidence():
         )
     ]
     
-    aggregator = EvidenceAggregator()
+    aggregator = EvidenceAggregator(ml_can_alert=True)
     alerts = aggregator.aggregate(flow, fv, rule_hits, ml_preds)
     assert len(alerts) == 1
     # Fused confidence is exact max(0.90, 0.95) = 0.95 (no arbitrary 1.1 multiplier)
@@ -267,3 +267,21 @@ def test_unrelated_flows_do_not_merge():
     assert alerts1[0].flow["src_ip"] == "192.168.1.10"
     assert alerts2[0].flow["src_ip"] == "192.168.1.20"
     assert alerts1[0].alert_id != alerts2[0].alert_id
+
+
+def test_synthetic_ml_cannot_create_or_inflate_an_alert():
+    """ML gate: synthetic-baseline models attach scores to rule alerts, nothing more."""
+    key = FlowKey(src_ip="192.168.1.10", src_port=12345, dst_ip="10.0.0.1", dst_port=80, protocol="TCP")
+    flow = FlowRecord(flow_key=key, start_time=1700000000.0, last_time=1700000002.0, packet_count=20, total_bytes=2000)
+    fv = FeatureExtractor().extract(flow)
+    anomaly = MLPrediction("isolation_forest_anomaly_detector", "THREAT_UNSUPERVISED_ANOMALY", -0.5, 0.99, True)
+    tunnel = MLPrediction("random_forest_threat_classifier", "THREAT_DNS_TUNNEL", 0.0, 0.99, True)
+    aggregator = EvidenceAggregator()
+    assert aggregator.ml_can_alert is False
+    assert aggregator.aggregate(flow, fv, [], [anomaly, tunnel]) == []
+
+    hit = RuleHit("dns_tunnel_detector", "THREAT_DNS_TUNNEL", "RULE_DNS_TUNNEL_VOLUME_LENGTH", "MEDIUM", 0.6)
+    (alert,) = aggregator.aggregate(flow, fv, [hit], [anomaly, tunnel])
+    assert alert.confidence == 0.6 and alert.severity == "MEDIUM"
+    assert alert.detection["ml_scores"] == [0.99]
+    assert alert.to_dict()["model_version"].endswith("+ml-synthetic-baseline")

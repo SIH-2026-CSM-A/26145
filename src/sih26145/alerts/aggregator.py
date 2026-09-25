@@ -55,7 +55,16 @@ def _split_evidence(raw: Dict[str, Any], features) -> tuple:
 
 
 class EvidenceAggregator:
-    """Synthesizes RuleHits and MLPredictions into versioned Alert instances."""
+    """Synthesizes RuleHits and MLPredictions into versioned Alert instances.
+
+    ML gate: the RandomForest and IsolationForest are fitted on synthetic vectors (AUDIT D1).
+    Until they are trained on labelled captures (ML_MODEL_VERSION != "synthetic-baseline"),
+    an ML prediction never creates an alert and never raises a rule alert's confidence or
+    severity; its score is only attached to a rule alert of the same threat class.
+    """
+
+    def __init__(self, ml_can_alert: bool = ML_MODEL_VERSION != "synthetic-baseline"):
+        self.ml_can_alert = ml_can_alert
 
     def aggregate(
         self,
@@ -104,6 +113,11 @@ class EvidenceAggregator:
                 ml_prob = float(mlp.probability)
                 ml_severity = _resolve_ml_severity(ml_prob)
                 
+                if not self.ml_can_alert:
+                    if tc in threat_groups:  # attach the score, declare the model, change nothing else
+                        threat_groups[tc]["ml_scores"].append(round(ml_prob, 4))
+                        threat_groups[tc]["detector_type"] = "HYBRID_RULE_ML"
+                    continue
                 if tc not in threat_groups:
                     threat_groups[tc] = {
                         "rule_matches": [],
