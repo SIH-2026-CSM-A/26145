@@ -31,7 +31,7 @@ export default function AlertStreamTable({ alerts, onSelectAlert, activeAlertId 
             Live Threat Event Log Feed
           </h3>
           <p className="text-xs text-slate-500 font-medium">
-            Real-time SSE event stream & historical SQLite alert records (<code className="text-blue-600 font-mono font-semibold">sih26145.alert.v1</code>)
+            Real-time SSE event stream & historical SQLite alert records (<code className="text-blue-600 font-mono font-semibold">sih26145.alert.v2</code>)
           </p>
         </div>
 

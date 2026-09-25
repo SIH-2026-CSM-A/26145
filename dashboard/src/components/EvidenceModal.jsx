@@ -114,7 +114,7 @@ export default function EvidenceModal({ alert, onClose }) {
           {/* Complete Raw JSON View */}
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
             <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-2 font-sans">
-              <FileCode className="w-4 h-4 text-purple-600" /> Standardized Alert JSON Schema (sih26145.alert.v1)
+              <FileCode className="w-4 h-4 text-purple-600" /> Standardized Alert JSON Schema (sih26145.alert.v2)
             </h3>
             <pre className="text-[11px] font-mono bg-slate-900 p-4 rounded-xl border border-slate-800 text-slate-100 overflow-x-auto max-h-48 shadow-inner">
               {JSON.stringify(alert, null, 2)}
