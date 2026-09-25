@@ -76,7 +76,7 @@ throughput · **AS** structured alert schema · **(a)–(f)** the six threat cla
   THREAT_ENCRYPTED_ANOMALY, THREAT_RECON_PORTSCAN, THREAT_EXFILTRATION`, plus
   `THREAT_UNSUPERVISED_ANOMALY` from the IsolationForest. Only `THREAT_DNS_TUNNEL` overlaps.
   None of the README's other six exist in code.
-- Threatens: **AS** and demo credibility. Fix: README to be corrected to the code taxonomy mapped
+- Threatens: **AS** and demo credibility. Fixed: README now lists the code taxonomy mapped
   to PS (a)–(f) (Part 2).
 
 ---
@@ -190,20 +190,20 @@ throughput · **AS** structured alert schema · **(a)–(f)** the six threat cla
 
 ## Summary
 
-| ID | Area | Fix location |
+| ID | Area | Status at end of session (2026-09-25) |
 |---|---|---|
-| D1 | ML fitted on dummy vectors | TODO Next; alert v2 labels it `synthetic-baseline` (Part 4) |
-| D2 | No windowed state | Store: Part 5; detectors (a)–(e): TODO Now |
-| D3 | No JA3/JA4 | Fingerprints: Part 5; detector (d): TODO Now |
-| D4 | Recon on failed connections | Features: Part 5; detector (e): TODO Now |
+| D1 | ML fitted on dummy vectors | Open (TODO Next); alerts now say `ml-synthetic-baseline` |
+| D2 | No windowed state | Store built and fed; detectors (a)–(e) not yet rewired (TODO Now) |
+| D3 | No JA3/JA4 | JA3/JA4/JA3S computed; detector (d) not yet rewired |
+| D4 | Recon on failed connections | Features built; detector (e) not yet rewired |
 | D5 | Benchmark pps, inflated 50× | Open (TODO Now) |
-| D6 | Taxonomy mismatch | This session, Part 2 |
-| A1–A2 | DDoS / C2 false positives | Features: Part 5; detectors: TODO Now |
-| A3 | Exfil false positives | This session, Part 5 |
-| A4 | DGA misfires | Features: Part 5; detector: TODO Now |
-| A5 | Fake metrics | This session, Part 4 |
+| D6 | Taxonomy mismatch | Fixed |
+| A1–A2 | DDoS / C2 false positives | Features built; detectors not yet rewired |
+| A3 | Exfil false positives | Fixed (direction-aware detector (f)) |
+| A4 | DGA misfires | Features built; detector not yet rewired |
+| A5 | Fake metrics | Fixed (null until wired) |
 | A6–A7 | Not wired; unbounded latency | Open (TODO Now) |
 | A8 | Truncated byte counts | Open (TODO Next) |
-| A9 | Direction never measured | This session, Part 3 |
-| A10 | Wall-clock timestamps | This session, Part 4 |
-| A11 | Drift | Part 2 + Part 4 (partial) |
+| A9 | Direction never measured | Fixed |
+| A10 | Wall-clock timestamps | Fixed |
+| A11 | Drift | Docs and DB default path fixed; AGENTS.md rule 7 path left for the owner |

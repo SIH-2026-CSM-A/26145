@@ -155,7 +155,7 @@ event time (flow timestamps), so PCAP replay is deterministic.
   low). Hashing uses blake2b, not Python's salted `hash()`, so results are reproducible.
 - **Bounded memory:** per-key tables are LRU-capped (hosts, destinations, pairs); sketches
   are fixed-size. `FeatureStore.memory_ceiling_bytes()` computes the ceiling from the
-  configuration; `tests/features/` floods the store with distinct sources and asserts the
+  configuration (array sizes plus a measured-then-padded per-entry object overhead); `tests/features/` floods the store with distinct sources and asserts the
   measured allocation stays under it. Default-configuration ceiling: see §13.
 
 ## 8. Detection
@@ -250,8 +250,12 @@ campaign graph (hosts as nodes, alerts as edges, grouped by `campaign_id`).
   replay, with hardware and Python version named. Packets/sec may be shown only alongside.
 - No figure is written anywhere until it has been measured on the named machine.
   Current state: **no throughput figure exists** (AUDIT D5).
-- Memory ceiling of the default FeatureStore configuration: to be measured in this
-  session's Part 5 and recorded here.
+- **FeatureStore memory, default configuration** (4,096 hosts, 4,096 destinations, 32,768
+  pairs, HLL p=8): stated ceiling from `memory_ceiling_bytes()` = **42.19 MiB**. Measured
+  at full occupancy (98,304 flow updates, every table at its cap) under `tracemalloc`:
+  **38.45 MiB peak**. Measured 2026-09-25 on an Intel i5-13450HX, WSL2, Python 3.13.14.
+  The ceiling scales linearly with the caps; `tests/features/test_feature_store.py` floods
+  a small configuration with 50x its host cap and asserts the bound.
 
 ## 14. Decisions
 
@@ -288,17 +292,17 @@ campaign graph (hosts as nodes, alerts as edges, grouped by `campaign_id`).
 
 | Component | Status |
 |---|---|
-| dpkt ingest, flow tracker with bidirectional matching, observability_state | dpkt ingest exists; bidirectional matching planned (Part 3) |
+| dpkt ingest, flow tracker with bidirectional matching, observability_state | Implemented |
 | Zeek adapter | Not started |
-| Feature contract + tier enforcement test | Planned (Part 3) |
-| FeatureStore (tier 2) with sketches | Planned (Part 5) |
-| JA3 / JA4 / JA3S | Planned (Part 5) |
-| Detector (f) with ratio / substitute branches | Planned (Part 5) |
+| Feature contract + tier enforcement test | Implemented (contract 1.0.0) |
+| FeatureStore (tier 2) with sketches | Implemented; fed by the orchestrator for every flushed flow |
+| JA3 / JA4 / JA3S | Implemented (dpkt path); JA4 verified against the FoxIO published example |
+| Detector (f) with ratio / substitute branches | Implemented (ruleset 1.1.0) |
 | Detectors (a)–(e) on tier-2 features | Not started — still the per-flow baseline rules (AUDIT A1–A4) |
 | LightGBM / trained IsolationForest | Not started — synthetic-baseline models in place (AUDIT D1) |
 | Bounded queue + drop counter, idle-flush timer | Not started (AUDIT A7) |
-| Alert v2 + storage migration + WAL | Planned (Part 4) |
+| Alert v2 + storage migration + WAL | Implemented |
 | Pipeline → API → SSE wiring | Not started (AUDIT A6) |
-| Dashboard v2 fields | Planned (Part 4) |
+| Dashboard v2 fields | Implemented (evidence, capture visibility, substitutions); browser-checked |
 | Campaign graph, visibility gauge | Not started |
 | Throughput benchmark (flows/s, Mbps) | Not started (AUDIT D5) |
