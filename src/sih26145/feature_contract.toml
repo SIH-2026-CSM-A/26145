@@ -123,12 +123,14 @@ reads = ["dst_distinct_srcs_w", "dst_src_ip_entropy_w", "dst_syn_only_ratio_w",
          "dst_reflector_flows_w", "dst_reflector_bytes_w", "dst_reflector_mean_pkt_w",
          "dst_bytes_vs_baseline", "dst_flows_vs_baseline", "dst_bytes_w", "dst_flows_w"]
 weakness = "The volumetric rule needs 5 closed windows of per-destination baseline before it can fire (warm-up)."
+tuning = "Ruleset 2.1.0 (docs/RULES.md): MIN_SRCS 100 -> 200, BASELINE_MULT 10 -> 100. No DDoS TP in the tuning set; bounded by the generated attack captures only."
 
 [consumers.c2_beacon_detector]
 ps_class = "b"
 max_state = "computable"
 reads = ["pair_iat_n", "pair_iat_cv", "pair_iat_mean", "src_periodic_dsts_w"]
-weakness = "Beacons with jitter above ~50% (CV > 0.35) and pollers slower than the windowed periodic-destination signature can see; the latter belong on the poller allowlist."
+weakness = "Beacons with jitter above ~70% (CV > 0.40), fewer than 16 check-ins or a period under 10 s, and pollers slower than the windowed periodic-destination signature can see; the latter belong on the poller allowlist."
+tuning = "Ruleset 2.1.0 (docs/RULES.md): MIN_GAPS 8 -> 16, MAX_CV 0.35 -> 0.40, MIN_PERIOD 1 s -> 10 s."
 
 [consumers.dga_lexical_detector]
 ps_class = "c"
@@ -152,12 +154,14 @@ weakness = "A single-user client with a fingerprint unique to the enclave, recon
 ps_class = "e"
 max_state = "degraded"
 reads = ["is_tcp", "src_distinct_dsts_w", "src_distinct_dst_ports_w", "src_syn_only_ratio_w", "dst_distinct_srcs_w"]
-weakness = "Connect scans that complete the handshake are not SYN-only; scans slower than 20 targets per window are not caught."
+weakness = "Connect scans that complete the handshake are not SYN-only; scans slower than 20 targets per window, or with under 80% unanswered SYNs, are not caught."
+tuning = "Ruleset 2.1.0 (docs/RULES.md): MIN_SYN_ONLY 0.6 -> 0.8, SHARED_INFRA_SRCS 20 -> 5."
 
 [consumers.exfiltration_detector]
 ps_class = "f"
 max_state = "reverse_dependent"
 reads = ["egress_bytes", "outbound_inbound_byte_ratio", "src_egress_bytes_z", "dst_distinct_srcs_longterm", "off_hours"]
+tuning = "Ruleset 2.1.0 (docs/RULES.md): MIN_RATIO 10 -> 50, MAX_DST_SOURCES 2 -> 1."
 
 [consumers.ml_flow_models]
 ps_class = "all"

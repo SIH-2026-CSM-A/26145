@@ -1,5 +1,7 @@
 """The seven rule detectors, PS (a)-(f). Every feature read is declared in
-feature_contract.toml (tests/contract scans this module). Thresholds are hand-set, not tuned."""
+feature_contract.toml (tests/contract scans this module). Thresholds of (a), (b), (e) and (f) were
+tuned on CTU-13-Extended s1/s5/s6 with s11/s12 held out (docs/RULES.md, ruleset 2.1.0); the DGA,
+tunnel and TLS thresholds are hand-set (header-only data cannot exercise them)."""
 
 from typing import Optional
 
@@ -19,9 +21,10 @@ class DDoSVolumeDetector(BaseRuleDetector):
     one destination, or a few sources pushing a destination far above its own baseline."""
     name = "ddos_volume_detector"
     threat_class = "THREAT_DDOS_VOLUME"
-    MIN_SRCS, MIN_SRC_ENTROPY, MIN_SYN_ONLY = 100, 5.0, 0.8
+    MIN_SRCS, MIN_SRC_ENTROPY, MIN_SYN_ONLY = 200, 5.0, 0.8  # MIN_SRCS 100 -> 200 (RULES.md)
     MIN_REFL_FLOWS, MIN_REFL_MEAN_PKT, MIN_REFL_BYTES = 50, 400.0, 1_000_000
-    BASELINE_MULT, MAX_FEW_SRCS, MIN_FLOOD_BYTES, MIN_FLOOD_FLOWS = 10.0, 10, 10_000_000, 100
+    # BASELINE_MULT 10 -> 100 (RULES.md: no DDoS TP in the tuning set, bounded by the attack captures)
+    BASELINE_MULT, MAX_FEW_SRCS, MIN_FLOOD_BYTES, MIN_FLOOD_FLOWS = 100.0, 10, 10_000_000, 100
 
     def detect(self, fv: FeatureVector, ctx=None) -> Optional[RuleHit]:
         if ctx is None:
@@ -78,7 +81,8 @@ class C2BeaconDetector(BaseRuleDetector):
     threat_class = "THREAT_C2_BEACON"
     # MIN_PERIOD: flow starts less than a second apart at a fixed rate are a rate-limited tool
     # (scanner, retry loop), not a check-in; beacons sleep for seconds to hours.
-    MIN_GAPS, MAX_CV, MIN_PERIOD, POLLER_PERIODIC_DSTS = 8, 0.35, 1.0, 10
+    # tuned (RULES.md): MIN_GAPS 8 -> 16, MAX_CV 0.35 -> 0.40, MIN_PERIOD 1 -> 10 s
+    MIN_GAPS, MAX_CV, MIN_PERIOD, POLLER_PERIODIC_DSTS = 16, 0.40, 10.0, 10
 
     def __init__(self):
         self.allowlist = load_networks(list_path("SIH26145_POLLER_ALLOWLIST", "poller_allowlist.txt"))
@@ -193,7 +197,7 @@ class ReconPortScanDetector(BaseRuleDetector):
     """PS (e): one source touching many hosts or ports, mostly with unanswered SYNs."""
     name = "recon_portscan_detector"
     threat_class = "THREAT_RECON_PORTSCAN"
-    MIN_FANOUT, MIN_SYN_ONLY, SHARED_INFRA_SRCS = 20, 0.6, 20
+    MIN_FANOUT, MIN_SYN_ONLY, SHARED_INFRA_SRCS = 20, 0.8, 5  # tuned: SYN-only 0.6 -> 0.8, shared 20 -> 5
 
     def detect(self, fv: FeatureVector, ctx=None) -> Optional[RuleHit]:
         if ctx is None or not fv.is_tcp:
@@ -225,9 +229,9 @@ class ExfiltrationDetector(BaseRuleDetector):
     name = "exfiltration_detector"
     threat_class = "THREAT_EXFILTRATION"
     MIN_OUTBOUND_BYTES = 1_000_000
-    MIN_RATIO = 10.0
+    MIN_RATIO = 50.0  # tuned 10 -> 50 (RULES.md)
     MIN_EGRESS_Z = 3.0
-    MAX_DST_SOURCES = 2  # "rare": at most this many internal hosts have ever talked to it
+    MAX_DST_SOURCES = 1  # "rare": at most this many internal hosts have ever talked to it (tuned 2 -> 1)
 
     def detect(self, fv: FeatureVector, ctx=None) -> Optional[RuleHit]:
         if ctx is None:

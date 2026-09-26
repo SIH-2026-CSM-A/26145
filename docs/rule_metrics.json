@@ -1,0 +1,895 @@
+{
+ "before": {
+  "s1": {
+   "flows": 4952836,
+   "split": "tune",
+   "detectors": {
+    "RULE_C2_PERIODIC_FLOWS": {
+     "alerts": 39595,
+     "tp": 295,
+     "fp": 720,
+     "unknown": 38580,
+     "tp_flow": 292,
+     "tp_entity": 3,
+     "fp_flow": 495,
+     "fp_entity": 225,
+     "precision_known": 0.2906,
+     "unknown_share": 0.9744,
+     "per_10k_flows": 79.94
+    },
+    "RULE_DDOS_SYN_FLOOD": {
+     "alerts": 1,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 1,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 0.0
+    },
+    "RULE_DDOS_VOLUME_BASELINE": {
+     "alerts": 65,
+     "tp": 0,
+     "fp": 1,
+     "unknown": 64,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 1,
+     "precision_known": 0.0,
+     "unknown_share": 0.9846,
+     "per_10k_flows": 0.13
+    },
+    "RULE_EXFIL_EGRESS_BASELINE": {
+     "alerts": 1904,
+     "tp": 136,
+     "fp": 0,
+     "unknown": 1768,
+     "tp_flow": 136,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.9286,
+     "per_10k_flows": 3.84
+    },
+    "RULE_EXFIL_OUTBOUND_RATIO": {
+     "alerts": 994,
+     "tp": 0,
+     "fp": 4,
+     "unknown": 990,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 4,
+     "fp_entity": 0,
+     "precision_known": 0.0,
+     "unknown_share": 0.996,
+     "per_10k_flows": 2.01
+    },
+    "RULE_RECON_FANOUT_SYN_ONLY": {
+     "alerts": 85,
+     "tp": 55,
+     "fp": 0,
+     "unknown": 30,
+     "tp_flow": 55,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.3529,
+     "per_10k_flows": 0.17
+    },
+    "lightgbm_flow_classifier": {
+     "alerts": 54691,
+     "tp": 20508,
+     "fp": 0,
+     "unknown": 34183,
+     "tp_flow": 20508,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.625,
+     "per_10k_flows": 110.42
+    }
+   }
+  },
+  "s5": {
+   "flows": 196185,
+   "split": "tune",
+   "detectors": {
+    "RULE_C2_PERIODIC_FLOWS": {
+     "alerts": 1733,
+     "tp": 5,
+     "fp": 66,
+     "unknown": 1662,
+     "tp_flow": 5,
+     "tp_entity": 0,
+     "fp_flow": 41,
+     "fp_entity": 25,
+     "precision_known": 0.0704,
+     "unknown_share": 0.959,
+     "per_10k_flows": 88.33
+    },
+    "RULE_DDOS_VOLUME_BASELINE": {
+     "alerts": 4,
+     "tp": 0,
+     "fp": 1,
+     "unknown": 3,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 1,
+     "fp_entity": 0,
+     "precision_known": 0.0,
+     "unknown_share": 0.75,
+     "per_10k_flows": 0.2
+    },
+    "RULE_EXFIL_EGRESS_BASELINE": {
+     "alerts": 90,
+     "tp": 6,
+     "fp": 0,
+     "unknown": 84,
+     "tp_flow": 6,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.9333,
+     "per_10k_flows": 4.59
+    },
+    "RULE_EXFIL_OUTBOUND_RATIO": {
+     "alerts": 129,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 129,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 6.58
+    },
+    "RULE_RECON_FANOUT_SYN_ONLY": {
+     "alerts": 2,
+     "tp": 2,
+     "fp": 0,
+     "unknown": 0,
+     "tp_flow": 2,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.0,
+     "per_10k_flows": 0.1
+    },
+    "lightgbm_flow_classifier": {
+     "alerts": 1901,
+     "tp": 37,
+     "fp": 0,
+     "unknown": 1864,
+     "tp_flow": 37,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.9805,
+     "per_10k_flows": 96.9
+    }
+   }
+  },
+  "s6": {
+   "flows": 1051586,
+   "split": "tune",
+   "detectors": {
+    "RULE_C2_PERIODIC_FLOWS": {
+     "alerts": 15793,
+     "tp": 5,
+     "fp": 264,
+     "unknown": 15524,
+     "tp_flow": 5,
+     "tp_entity": 0,
+     "fp_flow": 98,
+     "fp_entity": 166,
+     "precision_known": 0.0186,
+     "unknown_share": 0.983,
+     "per_10k_flows": 150.18
+    },
+    "RULE_DDOS_VOLUME_BASELINE": {
+     "alerts": 14,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 14,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 0.13
+    },
+    "RULE_EXFIL_EGRESS_BASELINE": {
+     "alerts": 449,
+     "tp": 25,
+     "fp": 1,
+     "unknown": 423,
+     "tp_flow": 25,
+     "tp_entity": 0,
+     "fp_flow": 1,
+     "fp_entity": 0,
+     "precision_known": 0.9615,
+     "unknown_share": 0.9421,
+     "per_10k_flows": 4.27
+    },
+    "RULE_EXFIL_OUTBOUND_RATIO": {
+     "alerts": 2373,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 2373,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 22.57
+    },
+    "RULE_RECON_FANOUT_SYN_ONLY": {
+     "alerts": 36,
+     "tp": 24,
+     "fp": 0,
+     "unknown": 12,
+     "tp_flow": 24,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.3333,
+     "per_10k_flows": 0.34
+    },
+    "lightgbm_flow_classifier": {
+     "alerts": 5402,
+     "tp": 3611,
+     "fp": 0,
+     "unknown": 1791,
+     "tp_flow": 3611,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.3315,
+     "per_10k_flows": 51.37
+    }
+   }
+  },
+  "s11": {
+   "flows": 144262,
+   "split": "held_out",
+   "detectors": {
+    "RULE_C2_PERIODIC_FLOWS": {
+     "alerts": 929,
+     "tp": 0,
+     "fp": 33,
+     "unknown": 896,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 13,
+     "fp_entity": 20,
+     "precision_known": 0.0,
+     "unknown_share": 0.9645,
+     "per_10k_flows": 64.4
+    },
+    "RULE_DDOS_VOLUME_BASELINE": {
+     "alerts": 5,
+     "tp": 1,
+     "fp": 1,
+     "unknown": 3,
+     "tp_flow": 0,
+     "tp_entity": 1,
+     "fp_flow": 0,
+     "fp_entity": 1,
+     "precision_known": 0.5,
+     "unknown_share": 0.6,
+     "per_10k_flows": 0.35
+    },
+    "RULE_EXFIL_EGRESS_BASELINE": {
+     "alerts": 19,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 19,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 1.32
+    },
+    "RULE_EXFIL_OUTBOUND_RATIO": {
+     "alerts": 57,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 57,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 3.95
+    },
+    "RULE_RECON_FANOUT_SYN_ONLY": {
+     "alerts": 2,
+     "tp": 1,
+     "fp": 0,
+     "unknown": 1,
+     "tp_flow": 0,
+     "tp_entity": 1,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.5,
+     "per_10k_flows": 0.14
+    },
+    "lightgbm_flow_classifier": {
+     "alerts": 425,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 425,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 29.46
+    }
+   }
+  },
+  "s12": {
+   "flows": 541957,
+   "split": "held_out",
+   "detectors": {
+    "RULE_C2_PERIODIC_FLOWS": {
+     "alerts": 7453,
+     "tp": 84,
+     "fp": 110,
+     "unknown": 7259,
+     "tp_flow": 58,
+     "tp_entity": 26,
+     "fp_flow": 76,
+     "fp_entity": 34,
+     "precision_known": 0.433,
+     "unknown_share": 0.974,
+     "per_10k_flows": 137.52
+    },
+    "RULE_DDOS_VOLUME_BASELINE": {
+     "alerts": 9,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 9,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 0.17
+    },
+    "RULE_EXFIL_EGRESS_BASELINE": {
+     "alerts": 120,
+     "tp": 1,
+     "fp": 0,
+     "unknown": 119,
+     "tp_flow": 1,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.9917,
+     "per_10k_flows": 2.21
+    },
+    "RULE_EXFIL_OUTBOUND_RATIO": {
+     "alerts": 473,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 473,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 8.73
+    },
+    "RULE_RECON_FANOUT_SYN_ONLY": {
+     "alerts": 2,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 2,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 0.04
+    },
+    "lightgbm_flow_classifier": {
+     "alerts": 804,
+     "tp": 16,
+     "fp": 0,
+     "unknown": 788,
+     "tp_flow": 16,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.9801,
+     "per_10k_flows": 14.84
+    }
+   }
+  }
+ },
+ "after": {
+  "s1": {
+   "flows": 4952836,
+   "split": "tune",
+   "detectors": {
+    "RULE_C2_PERIODIC_FLOWS": {
+     "alerts": 36336,
+     "tp": 272,
+     "fp": 610,
+     "unknown": 35454,
+     "tp_flow": 271,
+     "tp_entity": 1,
+     "fp_flow": 431,
+     "fp_entity": 179,
+     "precision_known": 0.3084,
+     "unknown_share": 0.9757,
+     "per_10k_flows": 73.36
+    },
+    "RULE_DDOS_VOLUME_BASELINE": {
+     "alerts": 34,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 34,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 0.07
+    },
+    "RULE_EXFIL_EGRESS_BASELINE": {
+     "alerts": 1862,
+     "tp": 136,
+     "fp": 0,
+     "unknown": 1726,
+     "tp_flow": 136,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.927,
+     "per_10k_flows": 3.76
+    },
+    "RULE_EXFIL_OUTBOUND_RATIO": {
+     "alerts": 125,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 125,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 0.25
+    },
+    "RULE_RECON_FANOUT_SYN_ONLY": {
+     "alerts": 57,
+     "tp": 48,
+     "fp": 0,
+     "unknown": 9,
+     "tp_flow": 48,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.1579,
+     "per_10k_flows": 0.12
+    },
+    "lightgbm_flow_classifier": {
+     "alerts": 54760,
+     "tp": 20522,
+     "fp": 0,
+     "unknown": 34238,
+     "tp_flow": 20522,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.6252,
+     "per_10k_flows": 110.56
+    }
+   }
+  },
+  "s5": {
+   "flows": 196185,
+   "split": "tune",
+   "detectors": {
+    "RULE_C2_PERIODIC_FLOWS": {
+     "alerts": 943,
+     "tp": 0,
+     "fp": 28,
+     "unknown": 915,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 15,
+     "fp_entity": 13,
+     "precision_known": 0.0,
+     "unknown_share": 0.9703,
+     "per_10k_flows": 48.07
+    },
+    "RULE_DDOS_VOLUME_BASELINE": {
+     "alerts": 2,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 2,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 0.1
+    },
+    "RULE_EXFIL_EGRESS_BASELINE": {
+     "alerts": 87,
+     "tp": 6,
+     "fp": 0,
+     "unknown": 81,
+     "tp_flow": 6,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.931,
+     "per_10k_flows": 4.43
+    },
+    "RULE_EXFIL_OUTBOUND_RATIO": {
+     "alerts": 62,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 62,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 3.16
+    },
+    "RULE_RECON_FANOUT_SYN_ONLY": {
+     "alerts": 2,
+     "tp": 2,
+     "fp": 0,
+     "unknown": 0,
+     "tp_flow": 2,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.0,
+     "per_10k_flows": 0.1
+    },
+    "lightgbm_flow_classifier": {
+     "alerts": 1906,
+     "tp": 37,
+     "fp": 0,
+     "unknown": 1869,
+     "tp_flow": 37,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.9806,
+     "per_10k_flows": 97.15
+    }
+   }
+  },
+  "s6": {
+   "flows": 1051586,
+   "split": "tune",
+   "detectors": {
+    "RULE_C2_PERIODIC_FLOWS": {
+     "alerts": 10414,
+     "tp": 9,
+     "fp": 184,
+     "unknown": 10221,
+     "tp_flow": 9,
+     "tp_entity": 0,
+     "fp_flow": 84,
+     "fp_entity": 100,
+     "precision_known": 0.0466,
+     "unknown_share": 0.9815,
+     "per_10k_flows": 99.03
+    },
+    "RULE_DDOS_VOLUME_BASELINE": {
+     "alerts": 4,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 4,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 0.04
+    },
+    "RULE_EXFIL_EGRESS_BASELINE": {
+     "alerts": 418,
+     "tp": 25,
+     "fp": 1,
+     "unknown": 392,
+     "tp_flow": 25,
+     "tp_entity": 0,
+     "fp_flow": 1,
+     "fp_entity": 0,
+     "precision_known": 0.9615,
+     "unknown_share": 0.9378,
+     "per_10k_flows": 3.97
+    },
+    "RULE_EXFIL_OUTBOUND_RATIO": {
+     "alerts": 31,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 31,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 0.29
+    },
+    "RULE_RECON_FANOUT_SYN_ONLY": {
+     "alerts": 33,
+     "tp": 24,
+     "fp": 0,
+     "unknown": 9,
+     "tp_flow": 24,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.2727,
+     "per_10k_flows": 0.31
+    },
+    "lightgbm_flow_classifier": {
+     "alerts": 5403,
+     "tp": 3611,
+     "fp": 0,
+     "unknown": 1792,
+     "tp_flow": 3611,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.3317,
+     "per_10k_flows": 51.38
+    }
+   }
+  },
+  "s11": {
+   "flows": 144262,
+   "split": "held_out",
+   "detectors": {
+    "RULE_C2_PERIODIC_FLOWS": {
+     "alerts": 341,
+     "tp": 0,
+     "fp": 14,
+     "unknown": 327,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 9,
+     "fp_entity": 5,
+     "precision_known": 0.0,
+     "unknown_share": 0.9589,
+     "per_10k_flows": 23.64
+    },
+    "RULE_DDOS_VOLUME_BASELINE": {
+     "alerts": 4,
+     "tp": 1,
+     "fp": 0,
+     "unknown": 3,
+     "tp_flow": 0,
+     "tp_entity": 1,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.75,
+     "per_10k_flows": 0.28
+    },
+    "RULE_EXFIL_EGRESS_BASELINE": {
+     "alerts": 19,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 19,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 1.32
+    },
+    "RULE_EXFIL_OUTBOUND_RATIO": {
+     "alerts": 16,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 16,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 1.11
+    },
+    "RULE_RECON_FANOUT_SYN_ONLY": {
+     "alerts": 2,
+     "tp": 1,
+     "fp": 0,
+     "unknown": 1,
+     "tp_flow": 0,
+     "tp_entity": 1,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.5,
+     "per_10k_flows": 0.14
+    },
+    "lightgbm_flow_classifier": {
+     "alerts": 426,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 426,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 29.53
+    }
+   }
+  },
+  "s12": {
+   "flows": 541957,
+   "split": "held_out",
+   "detectors": {
+    "RULE_C2_PERIODIC_FLOWS": {
+     "alerts": 5274,
+     "tp": 69,
+     "fp": 89,
+     "unknown": 5116,
+     "tp_flow": 48,
+     "tp_entity": 21,
+     "fp_flow": 63,
+     "fp_entity": 26,
+     "precision_known": 0.4367,
+     "unknown_share": 0.97,
+     "per_10k_flows": 97.31
+    },
+    "RULE_DDOS_VOLUME_BASELINE": {
+     "alerts": 5,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 5,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 0.09
+    },
+    "RULE_EXFIL_EGRESS_BASELINE": {
+     "alerts": 112,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 112,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 2.07
+    },
+    "RULE_EXFIL_OUTBOUND_RATIO": {
+     "alerts": 43,
+     "tp": 0,
+     "fp": 0,
+     "unknown": 43,
+     "tp_flow": 0,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": null,
+     "unknown_share": 1.0,
+     "per_10k_flows": 0.79
+    },
+    "lightgbm_flow_classifier": {
+     "alerts": 813,
+     "tp": 16,
+     "fp": 0,
+     "unknown": 797,
+     "tp_flow": 16,
+     "tp_entity": 0,
+     "fp_flow": 0,
+     "fp_entity": 0,
+     "precision_known": 1.0,
+     "unknown_share": 0.9803,
+     "per_10k_flows": 15.0
+    }
+   }
+  }
+ },
+ "changed_thresholds": {
+  "C2 MIN_GAPS": [
+   8,
+   16
+  ],
+  "C2 MAX_CV": [
+   0.35,
+   0.4
+  ],
+  "C2 MIN_PERIOD (s)": [
+   1.0,
+   10.0
+  ],
+  "Recon MIN_SYN_ONLY": [
+   0.6,
+   0.8
+  ],
+  "Recon SHARED_INFRA_SRCS": [
+   20,
+   5
+  ],
+  "Exfil MIN_RATIO": [
+   10.0,
+   50.0
+  ],
+  "Exfil MAX_DST_SOURCES": [
+   2,
+   1
+  ],
+  "DDoS MIN_SRCS": [
+   100,
+   200
+  ],
+  "DDoS BASELINE_MULT": [
+   10.0,
+   100.0
+  ]
+ },
+ "split": {
+  "tune": [
+   "s1",
+   "s5",
+   "s6"
+  ],
+  "held_out": [
+   "s11",
+   "s12"
+  ]
+ }
+}

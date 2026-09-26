@@ -1,5 +1,10 @@
 # Throughput benchmark
 
+> **Scope note (session 4, 2026-09-26).** These figures were measured on the session-3 code.
+> Session 4 added campaign correlation, which reads each flow's pivots and one fan-in value per
+> endpoint, and a hash computation per stored alert. Throughput has **not** been re-measured
+> since. Re-run the series below on an idle machine before quoting a figure for the current code.
+
 Measured throughput of SIH26145 with the trained models (`docs/MODELS.md`) and batched ML
 inference. Every figure below was measured on 2026-09-26 on the machine named here, on an idle
 machine: no download, dump or training job was running (checked with `pgrep` and the load
@@ -107,7 +112,8 @@ ingest path sustaining about 681 Mbps of large packets on one core. **Scenario 1
 not run.** It is 16× the size of s11 and shows the same Rbot ICMP-flood behaviour, so it would add
 wall time without adding a new traffic mix. No figure is claimed for it.
 
-Detection note, not a throughput figure: no rule flagged the flood. The few-source volumetric
+Detection note, not a throughput figure: no rule flagged the flood in this botnet-only capture.
+In the mixed-traffic CTU-13-Extended s11 capture, the flood is caught (`docs/RULES.md` §6). The few-source volumetric
 rule needs 5 closed windows of per-destination baseline, and the target first appears with the
 attack. This is the warm-up limit stated for PS (a).
 

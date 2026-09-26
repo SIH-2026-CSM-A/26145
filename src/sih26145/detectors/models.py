@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Any, Tuple
 
 # Version of the rule set as a whole; reported as alert model_version "rules-<version>".
-RULESET_VERSION = "2.0.0"  # 2.0.0: (a)-(e) on tier-2 features; 1.1.0: (f) direction-aware
+RULESET_VERSION = "2.1.0"  # 2.1.0: (a)(b)(e)(f) thresholds tuned on CTU-13-Extended (docs/RULES.md); 2.0.0: (a)-(e) on tier-2 features; 1.1.0: (f) direction-aware
 
 
 @dataclass(frozen=True)

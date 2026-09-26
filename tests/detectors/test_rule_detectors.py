@@ -8,6 +8,7 @@ from sih26145.features import FeatureExtractor
 from sih26145.features.directional import NetworkPolicy
 from sih26145.features.store import FeatureStore
 from sih26145.flow.models import FlowKey, FlowRecord
+from sih26145.detectors.rules.detectors import C2BeaconDetector, DDoSVolumeDetector
 from sih26145.utils.attack_scenarios import ramnit_dga
 
 SYN = 0x02
@@ -158,8 +159,9 @@ def rules(hits, threat_class):
 
 
 def test_ddos_syn_flood_from_many_sources_alerts_once():
+    n = DDoSVolumeDetector.MIN_SRCS + 50
     flows = [mk(f"198.18.{i // 200}.{i % 200 + 1}", "10.50.0.10", 80, t=1000 + i * 0.05, sport=1024 + i,
-                fwd_packets=1, fwd_bytes=54, fwd_tcp_flags=SYN) for i in range(150)]
+                fwd_packets=1, fwd_bytes=54, fwd_tcp_flags=SYN) for i in range(n)]
     hits = run_flows(flows)
     assert rules(hits, "THREAT_DDOS_VOLUME") == ["RULE_DDOS_SYN_FLOOD"]
     hit = hits[0]
@@ -179,8 +181,9 @@ def test_ddos_reflection_counts_only_unsolicited_answers():
 def test_c2_needs_min_gaps_between_periodic_flows():
     def beacons(n):
         return [mk("192.168.1.70", "203.0.113.66", 443, t=1000 + 30 * i, sport=45000 + i) for i in range(n)]
-    assert rules(run_flows(beacons(8)), "THREAT_C2_BEACON") == []            # 7 gaps
-    assert rules(run_flows(beacons(9)), "THREAT_C2_BEACON") == ["RULE_C2_PERIODIC_FLOWS"]  # 8 gaps
+    gaps = C2BeaconDetector.MIN_GAPS
+    assert rules(run_flows(beacons(gaps)), "THREAT_C2_BEACON") == []            # one gap short
+    assert rules(run_flows(beacons(gaps + 1)), "THREAT_C2_BEACON") == ["RULE_C2_PERIODIC_FLOWS"]
 
 
 def dns_flow(i, name, host="192.168.1.80", nx=True):
