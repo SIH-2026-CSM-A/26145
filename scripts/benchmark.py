@@ -1,8 +1,8 @@
 """End-to-end throughput benchmark: flows/s and Mbps, drop %, alert latency.
 
 Runs the real streaming pipeline (streaming.run_stream: ingest -> bounded queue -> store,
-detectors, ML, aggregator -> SQLite WAL file) on a capture and reports what it measured,
-with the machine it ran on.
+detectors, batched LightGBM + IsolationForest, aggregator -> SQLite WAL file) on a capture
+and reports what it measured, with the machine it ran on.
 
     uv run python scripts/benchmark.py CAPTURE.pcap                 # unthrottled (lossless)
     uv run python scripts/benchmark.py CAPTURE.pcap --speed 40      # paced at 40x real time (drops counted)
@@ -20,7 +20,6 @@ import json
 import os
 import platform
 import pstats
-import struct
 import sys
 import tempfile
 import time
@@ -29,6 +28,7 @@ from importlib.metadata import version
 
 import numpy as np
 
+from sih26145.ingest.reader import capture_records
 from sih26145.orchestrator import ThreatDetectionPipeline
 from sih26145.streaming import PipelineMetrics, run_stream
 
@@ -39,22 +39,19 @@ def hardware() -> dict:
     mem = next((int(line.split()[1]) // 1024 for line in open("/proc/meminfo") if line.startswith("MemTotal")), None)
     return {"cpu": cpu, "logical_cpus": os.cpu_count(), "mem_mib": mem, "os": platform.platform(),
             "python": platform.python_version(),
-            "packages": {p: version(p) for p in ("numpy", "dpkt", "scikit-learn", "aiosqlite")}}
+            "packages": {p: version(p) for p in ("numpy", "dpkt", "scikit-learn", "lightgbm", "aiosqlite")}}
 
 
 def capture_facts(path: str) -> dict:
-    """Records, wire bytes, truncated records and time span, from the pcap record headers."""
+    """Records, wire bytes, truncated records and time span, from the capture's record headers
+    (classic pcap or pcapng), read the same way the pipeline reads them."""
+    n = truncated = wire = 0
+    first = last = None
     with open(path, "rb") as f:
-        head = f.read(24)
-        endian = "<" if head[:4] in (b"\xd4\xc3\xb2\xa1", b"\x4d\x3c\xb2\xa1") else ">"
-        n = truncated = wire = 0
-        first = last = None
-        while len(rec := f.read(16)) == 16:
-            sec, usec, caplen, wirelen = struct.unpack(endian + "IIII", rec)
-            f.seek(caplen, 1)
-            n, wire, truncated = n + 1, wire + wirelen, truncated + (caplen < wirelen)
-            last = sec + usec / 1e6
-            first = last if first is None else first
+        for ts, buf, wirelen in capture_records(f):
+            n, wire, truncated = n + 1, wire + wirelen, truncated + (len(buf) < wirelen)
+            first = ts if first is None else first
+            last = ts
     return {"file": path, "file_mib": round(os.path.getsize(path) / 2**20, 1), "packets": n,
             "wire_bytes": wire, "truncated_records": truncated, "span_s": round(last - first, 1)}
 

@@ -54,13 +54,14 @@ async def test_idle_flow_is_scored_within_idle_timeout_plus_one_tick(tmp_path):
     pipeline = ThreatDetectionPipeline(":memory:")
     pipeline.flow_tracker.idle_timeout = 0.3
     await pipeline.init()
-    scored, score = {}, pipeline.score
+    scored, score_batch = {}, pipeline.score_batch
 
-    async def spy(flow):
-        scored[flow.flow_key.src_ip] = time.perf_counter()
-        return await score(flow)
+    async def spy(flows):
+        for flow in flows:
+            scored[flow.flow_key.src_ip] = time.perf_counter()
+        return await score_batch(flows)
 
-    pipeline.score = spy
+    pipeline.score_batch = spy
     try:
         start = time.perf_counter()
         await run_stream(pipeline, capture(tmp_path, packets), speed=1.0, tick=0.1)
@@ -106,3 +107,25 @@ async def test_metrics_endpoint_reports_the_attached_pipeline(tmp_path):
     assert data["flows_per_sec"] > 0 and data["drops"] == 0
     assert data["link_reverse_visibility_w"] == 1.0  # every sweep probe was answered
     assert set(data["alert_latency_ms"]) == {"p50", "p95", "p99"}
+
+
+@pytest.mark.asyncio
+async def test_batch_scoring_raises_the_same_alerts_as_one_flow_at_a_time(tmp_path, monkeypatch):
+    """Each flow's features are taken before the next flow's store update, so batching only
+    changes how many flows share one predict call."""
+    from sih26145 import streaming
+    from sih26145.utils.attack_scenarios import demo_packets
+
+    path = capture(tmp_path, demo_packets())
+
+    async def alerts(batch_max):
+        monkeypatch.setattr(streaming, "BATCH_MAX", batch_max)
+        pipeline = ThreatDetectionPipeline(":memory:")
+        try:
+            out = await pipeline.process_pcap(path)
+        finally:
+            await pipeline.storage.close()
+        return sorted((a.threat_class, a.flow_id, a.severity, tuple(a.detection["ml_scores"])) for a in out)
+
+    one, batched = await alerts(1), await alerts(256)
+    assert one == batched and len(one) > 5

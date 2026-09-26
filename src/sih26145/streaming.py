@@ -6,7 +6,8 @@ Three tasks on one event loop:
   stalls capture and never hides loss). Unthrottled file analysis blocks instead (lossless).
 - timer: every `tick` wall seconds, flushes flows idle for `idle_timeout` on the replay
   clock, so an idle flow is scored within idle_timeout + tick; also samples rates.
-- consumer (scoring): FeatureStore -> detectors -> aggregator -> storage -> publish.
+- consumer (scoring): drains up to BATCH_MAX queued flows; per flow FeatureStore -> rules ->
+  model row, then one predict call per model for the batch; then aggregator -> storage -> publish.
 """
 
 import asyncio
@@ -19,6 +20,7 @@ import numpy as np
 from sih26145.ingest.reader import PcapReader
 
 RATE_WINDOW_S = 5.0
+BATCH_MAX = 256  # flows scored per consumer turn: one predict call per model per batch
 
 
 class PipelineMetrics:
@@ -159,17 +161,25 @@ async def _timer(pipeline, queue, m: PipelineMetrics, clock: _ReplayClock, tick:
 
 
 async def _consume(pipeline, queue, m: PipelineMetrics, on_alert: Optional[Callable]):
+    """Drain up to BATCH_MAX queued flows and score them in one batch (one predict call per
+    model). Alerts stay per flow; each flow's latency runs from its flush to the batch's end."""
     while True:
-        flow = await queue.get()
-        if flow is None:
+        flows = [await queue.get()]
+        while len(flows) < BATCH_MAX and not queue.empty():
+            flows.append(queue.get_nowait())
+        last = flows[-1] is None  # the end-of-input marker is always the final item
+        flows = [f for f in flows if f is not None]
+        if flows:
+            results = await pipeline.score_batch(flows)
+            done = time.perf_counter()
+            for flow, alerts in zip(flows, results):
+                m.flows_scored += 1
+                m.flow_latency.append(done - flow.flushed_at)
+                for alert in alerts:
+                    m.alerts += 1
+                    m.alert_latency.append(done - flow.flushed_at)
+                    if on_alert is not None:
+                        on_alert(alert)
+        if last:
             return
-        alerts = await pipeline.score(flow)
-        done = time.perf_counter()
-        m.flows_scored += 1
-        m.flow_latency.append(done - flow.flushed_at)
-        for alert in alerts:
-            m.alerts += 1
-            m.alert_latency.append(done - flow.flushed_at)
-            if on_alert is not None:
-                on_alert(alert)
         await asyncio.sleep(0)

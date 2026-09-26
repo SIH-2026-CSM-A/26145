@@ -2,7 +2,7 @@
 
 **Problem statement:** SIH 2026 PS 26145 (NTRO) — AI-based detection of cyber threats in
 unidirectional IP traffic.
-**Status:** target design as of 2026-09-25. §15 marks what is implemented and what is not.
+**Status:** target design as of 2026-09-26. §15 marks what is implemented and what is not.
 **Companion documents:** `docs/AUDIT.md` (defects in the intake baseline),
 `src/sih26145/feature_contract.toml` (the Unidirectional Feature Contract), `TODO.md`.
 
@@ -179,12 +179,19 @@ Rules (a)–(e) read tier-2 store features only (ruleset 2.0.0, contract 1.1.0);
 an entity (destination, host or pair) and the suite raises one alert per (detector, entity)
 per 300 s of event time. Thresholds are hand-set; see the README for known weaknesses.
 
-**ML gate.** The RandomForest and IsolationForest are still fitted on synthetic vectors (AUDIT
-D1). `EvidenceAggregator(ml_can_alert=...)` defaults to false while `ML_MODEL_VERSION` is
-`synthetic-baseline`: an ML prediction never creates an alert and never changes a rule
-alert's confidence or severity; its score is attached to a rule alert of the same class and
-the alert's `model_version` names the synthetic model. The gate opens when trained models
-ship with a new version string.
+**ML gate and models** (`docs/MODELS.md`). LightGBM (`THREAT_ML_MALICIOUS_FLOW`) and an
+IsolationForest (`THREAT_UNSUPERVISED_ANOMALY`) are trained on header-only CTU-13-Extended
+captures (five scenarios). They read the 48 `ML_FEATURES` of each flow's model row
+(`models/features.py`): flow-level and tier-2 behaviour, with no DNS/TLS content, IP, exact port
+or capture time. `ML_MODEL_VERSION = ctu13x5-lgbm-if-1.0.0` opens the gate.
+- A LightGBM score above its alert-budget threshold (≤1 false positive per 10,000 benign
+  flows, out-of-fold) on a flow with no rule hit raises an ML alert **capped at MEDIUM**.
+- A flagged flow that also has a rule hit raises the rule alert's confidence and **severity by
+  one level** (agreement).
+- The IsolationForest only corroborates: its out-of-fold recall at the budget is near zero, so it
+  never alerts alone (manifest `alerts_alone: false`).
+- Every ML-raised or ML-agreeing alert carries the flow's top 5 LightGBM `pred_contrib`
+  features with their values.
 
 ## 9. Streaming and backpressure
 
@@ -195,8 +202,10 @@ flush runs on a timer so idle flows are scored within `idle_timeout` + one tick;
 with the active timeout this bounds per-flow detection latency.
 
 Implemented in `src/sih26145/streaming.py` (`run_stream`): producer (ingest + flow
-tracking), timer (idle flush + rate sampling), consumer (store, detectors, aggregator,
-storage, publish), one event loop. Paced or live replay drops on a full queue and counts
+tracking), timer (idle flush + rate sampling), and consumer, on one event loop. The consumer
+drains up to 256 queued flows per turn. For each flow, in order, it runs the store update,
+features, rules and model row, each taken at that flow's own scoring time. It then makes one
+predict call per model for the batch, and aggregates, stores and publishes per flow. Paced or live replay drops on a full queue and counts
 it; offline analysis (`process_pcap`, `analyze`) uses a blocking put, i.e. lossless
 backpressure. Flushed flows are enqueued oldest first. Alert latency is measured from a
 flow's flush (enqueue) to its alert being published; the wait from a flow's last packet to
@@ -268,20 +277,24 @@ campaign graph (hosts as nodes, alerts as edges, grouped by `campaign_id`).
 - Throughput is reported as **flows/sec and Mbps** (the PS units), end-to-end, on a stated
   replay, with hardware and Python version named. Packets/sec may be shown only alongside.
 - No figure is written anywhere until it has been measured on the named machine.
-- **Throughput, measured 2026-09-25** (`docs/BENCHMARK.md` has every run and the commands).
-  - Capture: CTU-13 scenario 12 (281.2 MiB, 352,266 packets, 8,927 flows).
+- **Throughput, measured 2026-09-26** (`docs/BENCHMARK.md` has every run and the commands).
   - Machine: Intel i5-13450HX, WSL2, Python 3.13.14; the pipeline uses one core.
-  - Scope: end to end, including both synthetic ML models on every flow and SQLite WAL
+  - Scope: end to end, including batched LightGBM + IsolationForest on every flow and SQLite WAL
     writes.
-  - **Sustained capacity: ~121 flows/s (120.6–124.4 over three runs) and ~31 Mbps
-    (31.3–32.2).**
-  - Paced at ~50% of capacity (26× real time): 0 drops; alert latency (flush → published)
-    is p50 165 ms, p95 496 ms, p99 641 ms.
-  - At ~2× capacity with a 1,000-flow queue: 42.6% of flows are dropped, and every drop is
-    counted.
-  - The profile puts ~93% of the time in per-flow single-row sklearn predict calls
-    (IsolationForest 73.6%, RandomForest 19.1%). The tier-2 store, the rules and the
-    aggregator are each under 1%.
+  - CTU-13 scenario 12, botnet hosts only (281.2 MiB, 8,927 flows): **sustained capacity about
+    930 flows/s (927.0–932.8 over three runs) and about 241 Mbps (240.3–241.8)**. A repeat run
+    landed within 0.1%.
+  - Mixed traffic, CTU-13-Extended scenario 12 (all hosts, headers only, 541,957 flows):
+    1,235.5 flows/s. Its 159.0 Mbps is computed from pcapng original packet lengths.
+  - Largest completed: scenario 11 botnet-only (4.07 GB ICMP flood, 281 flows) at 681.3 Mbps and
+    79,913 packets/s.
+  - **Detection latency** has two parts. Flow close takes 15 s idle or 60 s active (capture
+    time) plus at most one 1 s tick. Flush → alert at ~50% of capacity (paced 200×) is p50
+    6.9 ms, p95 265 ms, p99 305 ms, with 0 drops.
+  - At ~2× capacity with a 1,000-flow queue: 1.8% of flows dropped, every drop counted.
+  - The profile now puts dpkt packet parsing first (38.7%), then the model row's store reads
+    (13.6%), feature extraction (11.7%), the flow tracker (9.3%) and the batched
+    IsolationForest (6.2%). Session 2's 93% single-row predict overhead is gone.
 - **FeatureStore memory, default configuration** (4,096 hosts, 4,096 destinations, 32,768
   pairs, HLL p=8): stated ceiling from `memory_ceiling_bytes()` = **42.19 MiB**. Measured
   at full occupancy (98,304 flow updates, every table at its cap) under `tracemalloc`:
@@ -320,7 +333,7 @@ campaign graph (hosts as nodes, alerts as edges, grouped by `campaign_id`).
   visibility is measured per flow (§2).
 - **Deep learning** — unchanged from the baseline: explainability and CPU budget.
 
-## 15. Implementation status (2026-09-25)
+## 15. Implementation status (2026-09-26)
 
 | Component | Status |
 |---|---|
@@ -331,10 +344,11 @@ campaign graph (hosts as nodes, alerts as edges, grouped by `campaign_id`).
 | JA3 / JA4 / JA3S | Implemented (dpkt path); JA4 verified against the FoxIO published example |
 | Detector (f) with ratio / substitute branches | Implemented (ruleset 1.1.0) |
 | Detectors (a)–(e) on tier-2 features | Implemented (ruleset 2.0.0); 12 benign regression captures raise zero alerts |
-| LightGBM / trained IsolationForest | Not started — synthetic-baseline models in place, gated from alerting (AUDIT D1) |
+| LightGBM / trained IsolationForest | Implemented: trained on 5 CTU-13-Extended scenarios, validated leave-one-scenario-out and time-ordered (`docs/MODELS.md`); gate open, ML-only alerts capped at MEDIUM, IsolationForest corroborates only |
+| Feature dump (training data from the real pipeline) | Implemented: `python -m sih26145.cli dump-features` |
 | Bounded queue + drop counter, idle-flush timer | Implemented (`streaming.py`); drops counted in paced/live replay, lossless in offline analysis |
 | Alert v2 + storage migration + WAL | Implemented |
 | Pipeline → API → SSE wiring | Implemented: `sih26145 serve` runs both in one process; `/metrics` reads the live pipeline; browser-checked |
 | Dashboard v2 fields | Implemented (evidence, capture visibility, substitutions); browser-checked |
 | Campaign graph, visibility gauge | Not started |
-| Throughput benchmark (flows/s, Mbps) | Measured on CTU-13 scenario 12: ~121 flows/s, ~31 Mbps, one core (`docs/BENCHMARK.md`) |
+| Throughput benchmark (flows/s, Mbps) | Measured 2026-09-26 with batched ML: ~930 flows/s, ~241 Mbps on CTU-13 s12 (botnet-only); 1,236 flows/s on mixed traffic; one core (`docs/BENCHMARK.md`) |

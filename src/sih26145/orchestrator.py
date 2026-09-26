@@ -60,18 +60,30 @@ class ThreatDetectionPipeline:
         return out
 
     async def score(self, flow: FlowRecord) -> List[Alert]:
-        """Tier-2 update, then rules + ML on the flow, then persist and publish."""
-        self.feature_store.update(flow)
-        fv = self.feature_extractor.extract(flow)
-        ctx = DetectionContext(flow, self.feature_store, self.policy)
-        row = model_row(fv, ctx)  # at scoring time: after this flow's store update, before the next
-        if self.feature_sink is not None:
-            self.feature_sink(flow, row)
-        rule_hits = self.rule_suite.evaluate(fv, ctx)
-        ml_preds = self.ml_suite.predict(row) if self.ml_suite is not None else []
-        alerts = self.aggregator.aggregate(flow=flow, fv=fv, rule_hits=rule_hits, ml_predictions=ml_preds)
-        for alert in alerts:
-            await self.storage.save_alert(alert)
-            if self.publish is not None:
-                self.publish(alert.to_dict())
-        return alerts
+        """Score one flow (a batch of one)."""
+        return (await self.score_batch([flow]))[0]
+
+    async def score_batch(self, flows: List[FlowRecord]) -> List[List[Alert]]:
+        """Per flow, in order: tier-2 update, features, rules, model row. Each row is taken at
+        its own flow's scoring time, before the next flow's update. Then one predict call per
+        model for the whole batch, then each flow's alerts are persisted and published."""
+        staged = []
+        for flow in flows:
+            self.feature_store.update(flow)
+            fv = self.feature_extractor.extract(flow)
+            ctx = DetectionContext(flow, self.feature_store, self.policy)
+            row = model_row(fv, ctx)
+            if self.feature_sink is not None:
+                self.feature_sink(flow, row)
+            staged.append((flow, fv, row, self.rule_suite.evaluate(fv, ctx)))
+        preds = (self.ml_suite.predict_batch([s[2] for s in staged]) if self.ml_suite is not None
+                 else [[] for _ in staged])
+        out = []
+        for (flow, fv, _, rule_hits), ml_preds in zip(staged, preds):
+            alerts = self.aggregator.aggregate(flow=flow, fv=fv, rule_hits=rule_hits, ml_predictions=ml_preds)
+            for alert in alerts:
+                await self.storage.save_alert(alert)
+                if self.publish is not None:
+                    self.publish(alert.to_dict())
+            out.append(alerts)
+        return out

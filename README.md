@@ -7,7 +7,7 @@
 
 An explainable, read-only passive threat detection engine for traffic observed by an enclave that can never transmit (optical data diodes, passive taps). The capture may contain both halves of each conversation or only one; the system measures which, per flow, and declares for every feature what it needs (see `docs/ARCHITECTURE.md` §2 and §6). Detection uses deterministic rules and classical ML over flow metadata only, with no active mitigation and no payload decryption.
 
-> **Status:** see `docs/ARCHITECTURE.md` §15 and `docs/AUDIT.md`. The ML models are currently fitted on synthetic vectors, and no throughput figure has been measured yet.
+> **Status:** see `docs/ARCHITECTURE.md` §15 and `docs/AUDIT.md`. Model cards and validation: `docs/MODELS.md`. Throughput: `docs/BENCHMARK.md`.
 
 ---
 
@@ -134,6 +134,8 @@ Throughput benchmark (flows/s, Mbps, drop %, alert latency) on a capture of your
 uv run python scripts/benchmark.py path/to/capture.pcap              # capacity
 uv run python scripts/benchmark.py path/to/capture.pcap --speed 26   # paced replay
 ```
-Measured on CTU-13 scenario 12 (Intel i5-13450HX, WSL2, Python 3.13.14, one core): about
-121 flows/s and 31 Mbps sustained; at half that load, 0 drops and alert latency p99 641 ms
-after a flow is flushed. Details, all runs and the profile: `docs/BENCHMARK.md`.
+Measured 2026-09-26 on CTU-13 scenario 12 (Intel i5-13450HX, WSL2, Python 3.13.14, one core,
+trained models batched): about **930 flows/s and 241 Mbps** sustained, and 1,236 flows/s on the
+mixed-traffic CTU-13-Extended capture. Detection latency has two parts. Flow close takes 15 s
+idle or 60 s active (capture time) plus at most one 1 s tick. Flush → alert at half load is p50
+7 ms and p99 305 ms, with 0 drops. Details, all runs and the profile: `docs/BENCHMARK.md`.
