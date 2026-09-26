@@ -1,0 +1,14 @@
+services:
+  sensor:
+    build: .
+    image: sih26145-demo:latest
+    ports:
+      - "${SIH_PORT:-8000}:8000"   # host port; override with SIH_PORT=18000 if 8000 is taken
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

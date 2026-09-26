@@ -9,6 +9,33 @@ An explainable, read-only passive threat detection engine for traffic observed b
 
 > **Status:** see `docs/ARCHITECTURE.md` §15 and `docs/AUDIT.md`. Model cards and validation: `docs/MODELS.md`. Throughput: `docs/BENCHMARK.md`.
 
+
+## Watch it work in 2 minutes
+
+```bash
+git clone https://github.com/SIH-2026-CSM-A/26145.git && cd 26145 && uv sync && scripts/demo.sh
+```
+
+Then open **http://127.0.0.1:8000**. Needs Python 3.11+ with [uv](https://docs.astral.sh/uv/),
+and Node 20+ (only to build the dashboard the first time). With Docker instead:
+`docker compose up --build`, same address, replaying at 2×. See `DEPLOY.md`.
+
+What happens:
+- The real pipeline replays `demo/demo.pcap`, a committed 11-minute capture, at 5× real time,
+  so one loop takes about 2 minutes plus a 30 s hold.
+- For the first two minutes, only real university traffic crosses the link: header-only
+  CTU-13-Extended normal hosts (see `demo/ATTRIBUTION.md`).
+- Then one host, 192.168.1.66, scans, beacons to a C2 server, opens rare-fingerprint TLS
+  sessions, looks up DGA names, tunnels over DNS and uploads 1.2 MB. It shows up as **one
+  campaign** with the stages Discovery → Command and Control → Exfiltration.
+- A separate SYN flood hits 10.50.0.10 (its own campaign).
+- Three C2 alerts on real normal hosts are false positives, and are shown as they are.
+- Click a host for its stage timeline. Click an edge for the evidence, the contract state of
+  each feature, what the link could see, and the hash-chain record.
+- The replay speed is safe for the windowed features: at 5× the alerts are identical to an
+  unthrottled offline run (same classes, endpoints and campaigns, 0 flows dropped;
+  `scripts/demo_report.py`).
+
 ---
 
 ## 🔒 Passive Tap & Data-Diode Architecture
@@ -43,9 +70,15 @@ goes up one level. Every ML-raised alert lists its top LightGBM `pred_contrib` f
 - (c) **dictionary DGAs** (word-based names) have ordinary label entropy and are **not caught**.
   Without resolver responses in the capture, a host resolving many CDN-style names can reach
   the lexical threshold.
-- (b) beacons with more than ~50% jitter; (d) a single-user client with an enclave-unique
-  fingerprint reconnecting often to one server; (e) full-handshake connect scans.
-- Rule thresholds are hand-set on generated captures, not tuned on real traffic.
+- (b) beacons with more than ~70% jitter (CV > 0.40), fewer than 16 check-ins or a period under
+  10 s; (d) a single-user client with an enclave-unique fingerprint reconnecting often to one
+  server; (e) full-handshake connect scans.
+- Thresholds of (a), (b), (e) and (f) were tuned on real mixed traffic (CTU-13-Extended s1/s5/s6,
+  s11/s12 held out). The precision measured before and after, and what it does and does not
+  mean, is in `docs/RULES.md`. The DGA, tunnel and TLS thresholds are still hand-set: header-only
+  training captures cannot exercise them.
+- C2 stays noisy on real traffic: 97.3 alerts per 10k flows on held-out s12, and most of
+  them (97%) on unlabelled hosts (`docs/RULES.md` §4).
 
 | Model | Alert class | Detector |
 |---|---|---|

@@ -1,0 +1,10 @@
+.git
+.venv
+**/node_modules
+**/__pycache__
+dashboard/dist
+.code-review-graph
+.claude
+.ruff_cache
+*.db
+*.db-*

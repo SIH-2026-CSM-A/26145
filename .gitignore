@@ -70,3 +70,4 @@ dashboard/dist/
 # Generated demo/runtime artifacts
 *.db
 *.pcap
+!demo/demo.pcap

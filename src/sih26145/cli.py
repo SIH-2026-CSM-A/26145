@@ -32,6 +32,9 @@ def main():
     serve_parser.add_argument("--port", type=int, default=8000)
     serve_parser.add_argument("--db", type=str, default=None, help="SQLite database path (default: in memory)")
     serve_parser.add_argument("--tick", type=float, default=1.0, help="Idle-flush timer period, seconds")
+    serve_parser.add_argument("--loop", action="store_true",
+                              help="Replay forever; each loop starts from an empty in-memory store (not with --db)")
+    serve_parser.add_argument("--pause", type=float, default=30.0, help="Seconds to hold the final picture between loops")
 
     dump_parser = subparsers.add_parser("dump-features", help="Write one model-input row per scored flow (gzip CSV)")
     dump_parser.add_argument("pcap_file", type=str, help="Capture to replay (unthrottled, lossless)")
@@ -69,8 +72,10 @@ def main():
         import logging
         from sih26145.serve import serve
         logging.basicConfig(level=logging.INFO)
+        if args.loop and args.db:
+            parser.error("--loop starts every replay from an empty in-memory store; drop --db")
         asyncio.run(serve(args.pcap_file, None if args.unthrottled else args.speed,
-                          args.host, args.port, args.db, args.tick))
+                          args.host, args.port, args.db, args.tick, loop=args.loop, pause=args.pause))
         return
 
     async def run_cli():

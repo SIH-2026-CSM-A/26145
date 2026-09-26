@@ -22,23 +22,39 @@ api = importlib.import_module("sih26145.api.app")
 
 
 async def serve(pcap: str, speed: Optional[float] = 1.0, host: str = "127.0.0.1", port: int = 8000,
-                db: Optional[str] = None, tick: float = 1.0, queue_max: int = 10_000) -> None:
+                db: Optional[str] = None, tick: float = 1.0, queue_max: int = 10_000,
+                loop: bool = False, pause: float = 30.0) -> None:
+    """Replay `pcap` once, or forever with `loop`. Each loop starts from a fresh in-memory alert
+    store, hash chain and pipeline (a FeatureStore cannot take timestamps going backwards), holds
+    the final picture for `pause` seconds, and sends dashboards an SSE `reset`."""
+    if loop and db:
+        raise ValueError("--loop starts every replay from an empty in-memory store; it cannot append to --db")
     if db:
         api.storage = AlertStorage(db)
     server = uvicorn.Server(uvicorn.Config(api.app, host=host, port=port, log_level="info"))
-    pipeline = ThreatDetectionPipeline(storage=api.storage, publish=api.broadcaster.broadcast)
-    metrics = api.pipeline_metrics = PipelineMetrics(queue_max)
-    api.source = {"capture": os.path.basename(pcap), "speed": speed, "loop": None}
 
     async def replay():
         while not server.started:  # the API lifespan opens the shared storage first
             if server.should_exit:
                 return
             await asyncio.sleep(0.05)
-        pace = f"{speed}x real time" if speed else "unthrottled"
-        log.info("replaying %s (%s)", pcap, pace)
-        await run_stream(pipeline, pcap, speed=speed, tick=tick, metrics=metrics)
-        log.info("replay finished: %d flows scored, %d alerts, %d dropped",
-                 metrics.flows_scored, metrics.alerts, metrics.drops)
+        n = 0
+        while not server.should_exit:
+            n += 1
+            if n > 1:
+                old, api.storage = api.storage, AlertStorage(":memory:")
+                await api.storage.init_db()
+                await old.close()
+                api.broadcaster.reset({"loop": n})
+            pipeline = ThreatDetectionPipeline(storage=api.storage, publish=api.broadcaster.broadcast)
+            metrics = api.pipeline_metrics = PipelineMetrics(queue_max)
+            api.source = {"capture": os.path.basename(pcap), "speed": speed, "loop": n if loop else None}
+            log.info("replaying %s (%s), loop %d", pcap, f"{speed}x real time" if speed else "unthrottled", n)
+            await run_stream(pipeline, pcap, speed=speed, tick=tick, metrics=metrics)
+            log.info("replay finished: %d flows scored, %d alerts, %d dropped",
+                     metrics.flows_scored, metrics.alerts, metrics.drops)
+            if not loop:
+                return
+            await asyncio.sleep(pause)
 
     await asyncio.gather(server.serve(), replay())
