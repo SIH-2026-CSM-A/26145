@@ -18,6 +18,11 @@ Read AGENTS.md (standing rules), docs/ARCHITECTURE.md, docs/AUDIT.md, TODO.md fi
 - `api/app.py` holds module-global `storage` and `broadcaster`; tests share them.
 - `src/sih26145/detectors/rules/` has no `__init__.py` (namespace package) — imports work.
 - Zeek is not installed on this machine; the dpkt path is the one that runs.
-- The ML models are fitted on synthetic vectors (AUDIT D1). Never quote their accuracy.
-- No throughput figure exists yet (AUDIT D5). Don't write one until measured.
+- ML models are trained on CTU-13-Extended (docs/MODELS.md). No accuracy figure anywhere; quote
+  only the per-scenario numbers in MODELS.md. Retraining: `scripts/train_models.py` (deterministic).
+- Changing `models/features.py` ML_FEATURES or the model row = redump + retrain; the suite refuses
+  artefacts whose manifest features/version don't match.
+- CTU-13 public `botnet-capture-*.pcap` files hold only infected hosts; benign flows come from the
+  CTU-13-Extended `*.truncated.pcap` files (pcapng, headers only) in `26145-data/ctu13-extended/`.
+- Throughput figures live in docs/BENCHMARK.md; re-measure (idle machine) before changing them.
 - Commits: conventional commits, no AI-attribution trailers.

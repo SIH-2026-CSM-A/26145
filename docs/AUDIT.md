@@ -25,9 +25,13 @@ throughput · **AS** structured alert schema · **(a)–(f)** the six threat cla
   synthetic "DGA" class is every UDP/53 flow with one query, so the model learned "port 53 =
   DGA". The IsolationForest flags a SYN with two retransmits, a normal ping, an IMAPS session and a `www.google.com` lookup as
   anomalies.
-- Threatens: (a)–(f) credibility; any accuracy claim. Fix: LightGBM + IsolationForest
-  trained on labelled captures (TODO Next). `model_version` in alert v2 (Part 4) says
-  `synthetic-baseline` so no alert overstates this.
+- Threatens: (a)–(f) credibility; any accuracy claim. **Fixed (session 3):** the synthetic
+  models are deleted. LightGBM and an IsolationForest are trained on five header-only
+  CTU-13-Extended scenarios, from rows dumped by the real pipeline. They are validated
+  leave-one-scenario-out and time-ordered, with no random split, and documented in
+  `docs/MODELS.md`. The gate is open under `ctu13x5-lgbm-if-1.0.0`: LightGBM-only alerts are
+  capped at MEDIUM and the IsolationForest only corroborates. Cross-scenario recall at the
+  1-per-10k budget is 28%; MODELS.md states it as measured.
 
 ### D2 — No per-host or per-destination state (confirmed)
 - Every detector's signature is `detect(fv: FeatureVector)` (`detectors/rules/base.py:23`);
@@ -194,13 +198,13 @@ throughput · **AS** structured alert schema · **(a)–(f)** the six threat cla
 
 ## Summary
 
-| ID | Area | Status at end of session (2026-09-25) |
+| ID | Area | Status at end of session 3 (2026-09-26) |
 |---|---|---|
-| D1 | ML fitted on dummy vectors | Open (TODO Next); gated since session 2: ML scores attach to rule alerts, never create one |
+| D1 | ML fitted on dummy vectors | Fixed: trained on CTU-13-Extended, validated per scenario (`docs/MODELS.md`, session 3) |
 | D2 | No windowed state | Fixed: all seven detectors read the store (session 2) |
 | D3 | No JA3/JA4 | Fixed: detector (d) uses JA4 rarity + known-bad list, no port rule (session 2) |
 | D4 | Recon on failed connections | Fixed: fan-out + SYN-only ratio; `failed_tcp` regression capture (session 2) |
-| D5 | Benchmark pps, inflated 50× | Fixed: `scripts/benchmark.py` rewritten; flows/s + Mbps measured on CTU-13 scenario 12 (`docs/BENCHMARK.md`, session 2) |
+| D5 | Benchmark pps, inflated 50× | Fixed: `scripts/benchmark.py` rewritten; flows/s + Mbps measured on CTU-13 scenario 12 (`docs/BENCHMARK.md`, session 2; re-measured with trained models, session 3) |
 | D6 | Taxonomy mismatch | Fixed |
 | A1–A2 | DDoS / C2 false positives | Fixed: dst-tier DDoS rules, pair-level C2 with poller suppression; regression captures (session 2) |
 | A3 | Exfil false positives | Fixed (direction-aware detector (f)) |

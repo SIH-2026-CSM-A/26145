@@ -1,5 +1,144 @@
 # Session Log
 
+## 2026-09-26 — Claude Code (Opus 5.5) — session 3: trained models, MODELS.md, batched throughput
+
+**Agent:** Claude Code (Anthropic, model Opus 5.5). Branch `main`, starting at `08cc107`
+(177 tests passing). No other agent worked on the repo during this session.
+
+### Owner decisions (asked at planning)
+- **The public CTU-13 pcaps are botnet-only.** 99.8% of scenario 12's packets touch the infected
+  IPs, so `Normal` rows had nothing to join. Decision: download the CTU-13-Extended truncated
+  full-traffic pcaps for five scenarios, smallest first (s5, s11, s12, s6, s1; none over
+  1.5 GB bz2), into `~/NewProjects/26145-data/ctu13-extended/` with `wget -c`.
+- CTU rows carry no DNS/TLS payload. The supervised model covers flow behaviour only; DGA,
+  tunnel and encrypted-session detection stay with the rules.
+- `To-Botnet` excluded; malicious = `From-Botnet`, benign = `From-Normal`.
+- Budget rule added by the owner: when the pooled benign set is under 30,000 flows, widen to
+  ≥ 3 expected false positives and say so. The final set has 83,035 benign flows, so no
+  widening was needed.
+- A mixed-traffic benchmark run is added on the CTU-13-Extended s12 capture.
+
+### Shipped (commits in order)
+1. `aeffee1 feat(training):`
+   - A8 fixed for classic pcap **and pcapng**: the wire length comes from record headers and
+     packet blocks.
+   - `models/features.py` `model_row` is the single model-input function, used by both the
+     dump and the runtime.
+   - `dump-features` CLI; the CTU-13 label join (`training/labels.py`); `build_dataset.py`.
+   - Contract 1.2.0 (`dst_port_class`, `feature_dump` consumer).
+2. `a4ec46b feat(models):`
+   - LightGBM + IsolationForest trained on the five scenarios. The synthetic RF/IF and
+     `scripts/forensic_verification.py` are deleted.
+   - Leakage check; leave-one-scenario-out and time-ordered validation; alert-budget
+     threshold.
+   - `pred_contrib` evidence; ML-only alerts capped at MEDIUM; agreement raises severity one
+     level. Artefacts are hash-checked; `lightgbm` added to pyproject.
+3. `4d57d4a perf:`
+   - Batched consumer (256 flows, one predict per model per batch, `n_jobs=1` /
+     `num_threads=1`).
+   - Benchmark series rerun; BENCHMARK.md, ARCHITECTURE §8/§9/§13/§15, README.
+4. `docs:` (this commit): `docs/MODELS.md` (model cards, data, coverage, validation, results,
+   failure modes, commands, generated feature table); AUDIT D1; TODO; CLAUDE.md gotchas; this
+   log.
+
+### Data
+- Five captures were dumped through the real pipeline:
+  - s1: 4,952,836 flows, 63 min;
+  - s5: 196,185;
+  - s6: 1,051,586;
+  - s11: 144,262;
+  - s12: 541,957.
+- Joined: 31,665 `From-Botnet` and 83,035 `From-Normal` flows; ≥ 99.9% of labelled binetflow rows
+  matched a flow in every scenario. The files have no `To-Botnet` rows.
+- Generated attack captures are a held-out evaluation set only.
+
+### Results (docs/MODELS.md has every table)
+- **Leave-one-scenario-out, pooled:**
+  - LightGBM: PR-AUC 0.970. At the 1-per-10k budget (threshold 0.99999974), 7 false positives
+    in 83,035 benign flows and **28% recall**, nearly all from s1. s6 DonBot and s11 Rbot get
+    0 recall held out, although s6 ranks perfectly (PR-AUC 1.0).
+  - IsolationForest: PR-AUC 0.790; recall 0.07% at the budget.
+- **Random-split falsification:** LightGBM PR-AUC 1.000 and recall 99.96%. That is what a leaky
+  split would have claimed. Both sets are recorded.
+- **Calibration:** Brier 0.043; overconfident at the extremes, so the scores are a ranking.
+- **Generated held-out attacks:** LightGBM flags none. The rules cover them.
+
+### Throughput (docs/BENCHMARK.md)
+- CTU-13 s12 botnet-only: **927.0–932.8 flows/s, 240.3–241.8 Mbps**, one core (session 2:
+  ~121). A repeat run landed within 0.1%.
+- Paced at ~50% (200×): 0 drops. Detection latency is flow close (15 s idle / 60 s active,
+  plus ≤ 1 s tick), then flush → alert p50/p95/p99 of 6.9/265/305 ms.
+- ~2× overload with a 1k queue: 1.8% dropped, all counted.
+- Mixed traffic (CTU-13-Extended s12, all hosts): 1,235.5 flows/s, with Mbps from pcapng
+  original lengths.
+- Largest completed: s11 botnet-only, 4.07 GB at 681 Mbps. s10 (66 GB) was not run.
+- New profile top five: dpkt parsing 38.7%, model-row store reads 13.6%, extraction 11.7%,
+  tracker 9.3%, batched IsolationForest 6.2%.
+
+### Verification
+- `uv run pytest -q`: **204 passed** (177 at session start; tests added and changed listed
+  below). The 2 warnings are the third-party deprecations present at baseline.
+- All 12 benign regression captures raise 0 alerts with the ML gate open. Every attack capture
+  fires its detector exactly once.
+- Ruff with the rule set session 2 counted (`--isolated --select E4,E7,E9,F`): 41 findings at
+  `08cc107`, 31 now, none new. The installed ruff 0.16.9 has wider defaults, so the old
+  "default rules" wording no longer names the same rule set.
+- `npm run build` passes.
+
+### Falsification log (each break on one line, red on an assertion, then restored)
+| Target | Break | Red test |
+|---|---|---|
+| Leakage check | `"src_ip"` appended to `ML_FEATURES` | `test_model_features_pass_the_leakage_check`; `train_models.py` refuses |
+| Scenario split | `logo_folds` yields random row folds | `test_validation_folds_never_share_a_scenario` (metrics change: MODELS.md §4.4) |
+| ML severity cap | `_cap_ml_only` bypassed | `test_ml_only_alert_is_capped_at_medium[0.8]`, `[0.99]`, `test_evidence_aggregation_ml_only` |
+| A8, classic pcap | parser uses captured length | `test_truncated_records_report_wire_length_and_parse_headers` |
+| A8, pcapng | reader reports captured length | `test_truncated_pcapng_blocks_report_wire_length` |
+
+### Found and fixed along the way
+- **The CTU-13-Extended files are pcapng.** The first A8 fix covered only classic pcap. The
+  first training pass therefore used header sizes (54/42/66 B) for every byte feature, and the
+  first mixed-traffic Mbps figure was wrong. This was found through the benchmark's capture
+  facts (2 packets, a 1.1e9 s span). pcapng block original lengths are now read. All five
+  scenarios were re-dumped and the models retrained. Nothing from the first pass is quoted
+  except the recorded variant history in MODELS.md §4.5.
+- **Dump column collision:** the FeatureVector's float `dst_port` overwrote the identity port
+  ("53.0"), and the first join matched almost nothing. Identity columns now win; the parity
+  test checks it.
+- **A shortcut from generated data:** training on the generated attack captures made four
+  benign regression captures fire (LightGBM on RTP and on a failed TCP connection). The
+  generated captures are now held out; the final models are CTU-only.
+
+### Decided (after seeing results; stated as such in MODELS.md)
+- **The IsolationForest corroborates only** (manifest `alerts_alone: false`). With wire sizes,
+  it flagged the benign one-way download (0.660 against a threshold of 0.651), and its
+  out-of-fold recall at the budget is 0.07%. The threshold was not moved. It still attaches its
+  score and raises severity on rule agreement.
+- Small margins are disclosed: a benign failed TCP connection scores 14.76 log-odds against
+  a LightGBM threshold of 15.15.
+
+### Existing tests changed
+- `tests/models/test_ml_models.py`: rewritten for the trained artefacts (manifest, batch =
+  single, NaN kept, port class, tamper refusal).
+- `tests/alerts/test_alert_engine.py`:
+  - `test_evidence_aggregation_ml_only` now expects MEDIUM (the cap);
+  - the hybrid test expects CRITICAL (agreement);
+  - `test_synthetic_ml_cannot_create_or_inflate_an_alert` became
+    `test_closed_ml_gate_cannot_create_or_inflate_an_alert`.
+- `tests/alerts/test_alert_schema_v2.py`: `..._declare_the_synthetic_model` became
+  `test_alerts_carrying_ml_scores_declare_the_model_version`.
+- `tests/contract/test_feature_contract.py`: the ML array scan was replaced by
+  `test_ml_features_match_declaration`; `test_feature_dump_reads_match_declaration` added.
+- `tests/detectors/test_attack_captures.py`: rule counting ignores ML-only alerts (true
+  positives on attack flows, not detector cross-fire).
+- `tests/streaming/test_streaming.py`: the idle-flush spy wraps `score_batch`.
+
+### Incomplete / next (TODO Now)
+- Rule precision on real traffic is unmeasured, and the rules are noisy on mixed traffic
+  (7,453 C2 alerts on s12). The labelled dumps now make this measurable.
+- LightGBM cross-family recall is low, and the failed-TCP margin is small; more benign
+  diversity is needed.
+- Paced replay above ~20× distorts windowed features (timer tick in capture time).
+
 ## 2026-09-25 — Claude Code (Opus 5.5) — session 2: real detectors, streaming, first throughput figure
 
 **Agent:** Claude Code (Anthropic, model Opus 5.5). Branch `main`, starting at `4505ec9`
