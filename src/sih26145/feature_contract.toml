@@ -166,12 +166,15 @@ reads = [
   "duration", "total_packets", "total_bytes", "pps", "bps",
   "pkt_size_min", "pkt_size_max", "pkt_size_mean", "pkt_size_std",
   "pkt_size_q25", "pkt_size_q50", "pkt_size_q75",
-  "iat_mean", "iat_var", "iat_min", "iat_max", "jitter",
-  "burstiness_ratio", "small_pkt_ratio", "is_tcp", "is_udp", "is_icmp", "dst_port",
-  "dns_query_count", "dns_max_domain_entropy", "dns_max_subdomain_depth",
-  "tls_client_hello_count", "tls_max_sni_entropy", "tls_max_sni_length",
-  "has_syn", "has_fin", "has_rst",
+  "iat_mean", "iat_var", "iat_min", "iat_max", "jitter", "burstiness_ratio", "small_pkt_ratio",
+  "is_tcp", "is_udp", "is_icmp", "has_syn", "has_fin", "has_rst", "dst_port_class", "reverse_seen",
+  "src_flows_w", "src_distinct_dsts_w", "src_distinct_dst_ports_w", "src_syn_only_ratio_w",
+  "src_periodic_dsts_w", "dst_flows_w", "dst_bytes_w", "dst_distinct_srcs_w", "dst_src_ip_entropy_w",
+  "dst_syn_only_ratio_w", "dst_reflector_flows_w", "dst_reflector_bytes_w", "dst_reflector_mean_pkt_w",
+  "dst_bytes_vs_baseline", "dst_flows_vs_baseline", "dst_distinct_srcs_longterm",
+  "pair_flows_w", "pair_iat_mean", "pair_iat_cv", "pair_iat_n", "pair_history_count",
 ]
+weakness = "Trained on header-only CTU-13-Extended captures: no DNS/TLS content features, so DGA, tunnelling and encrypted-session classes stay with the rule detectors. See docs/MODELS.md."
 
 # The feature dump (training data) and the runtime model input: models/features.py model_row.
 # Reads every FeatureVector field plus the store and flow-context features the detectors read;

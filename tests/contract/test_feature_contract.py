@@ -7,7 +7,6 @@ import inspect
 import pytest
 
 import sih26145.detectors.rules.detectors as rule_detectors
-import sih26145.models.anomaly as anomaly
 import sih26145.models.features as model_features
 from sih26145.contract import UnavailableFeatureError, load_contract, parse_contract
 from sih26145.features.models import FeatureVector
@@ -58,12 +57,12 @@ def test_detector_reads_match_declaration_and_tier(name, cls):
     assert reads == set(contract.consumer(name).reads), "declared reads drifted from the code"
 
 
-def test_ml_feature_array_reads_match_declaration():
+def test_ml_features_match_declaration():
+    """The models read exactly ML_FEATURES, a subset of the dumped row."""
     contract = load_contract()
-    fn = ast.parse(inspect.getsource(anomaly.feature_vector_to_array))
-    reads = scan_reads(fn)
-    assert contract.read_violations("ml_flow_models", reads) == []
-    assert reads == set(contract.consumer("ml_flow_models").reads)
+    assert contract.read_violations("ml_flow_models", model_features.ML_FEATURES) == []
+    assert model_features.ML_FEATURES == list(contract.consumer("ml_flow_models").reads)
+    assert set(model_features.ML_FEATURES) <= set(contract.consumer("feature_dump").reads)
 
 
 def test_feature_dump_reads_match_declaration():

@@ -27,9 +27,14 @@ def _sanitize_value(val: Any) -> Any:
     return val
 
 
-def evidence_item(feature: str, value: Any, baseline: Any = None, baseline_source: Optional[str] = None) -> Dict[str, Any]:
-    """One v2 evidence row: a contract feature, its observed value, and what normal looks like."""
-    return {"feature": feature, "value": value, "baseline": baseline, "baseline_source": baseline_source}
+def evidence_item(feature: str, value: Any, baseline: Any = None, baseline_source: Optional[str] = None,
+                  contribution: Optional[float] = None) -> Dict[str, Any]:
+    """One v2 evidence row: a contract feature, its observed value, and what normal looks like.
+    Model evidence adds `contribution`: the feature's pred_contrib to the model score (log-odds)."""
+    row = {"feature": feature, "value": value, "baseline": baseline, "baseline_source": baseline_source}
+    if contribution is not None:
+        row["contribution"] = contribution
+    return row
 
 
 @dataclass

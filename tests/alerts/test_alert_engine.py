@@ -115,7 +115,7 @@ def test_evidence_aggregation_ml_only():
     assert len(alerts) == 1
     assert alerts[0].detector["type"] == "ML"
     assert alerts[0].confidence == 0.85
-    assert alerts[0].severity == "HIGH"
+    assert alerts[0].severity == "MEDIUM"  # ML-only alerts are capped
 
 
 def test_evidence_aggregation_hybrid_uninvented_fused_confidence():
@@ -150,6 +150,7 @@ def test_evidence_aggregation_hybrid_uninvented_fused_confidence():
     # Fused confidence is exact max(0.90, 0.95) = 0.95 (no arbitrary 1.1 multiplier)
     assert alerts[0].confidence == 0.95
     assert alerts[0].detector["type"] == "HYBRID_RULE_ML"
+    assert alerts[0].severity == "CRITICAL"  # rule + model agreement: one level up
 
 
 def test_benign_traffic_zero_alerts():
@@ -269,19 +270,18 @@ def test_unrelated_flows_do_not_merge():
     assert alerts1[0].alert_id != alerts2[0].alert_id
 
 
-def test_synthetic_ml_cannot_create_or_inflate_an_alert():
-    """ML gate: synthetic-baseline models attach scores to rule alerts, nothing more."""
+def test_closed_ml_gate_cannot_create_or_inflate_an_alert():
+    """ML gate closed (untrained models): scores attach to rule alerts, nothing more."""
     key = FlowKey(src_ip="192.168.1.10", src_port=12345, dst_ip="10.0.0.1", dst_port=80, protocol="TCP")
     flow = FlowRecord(flow_key=key, start_time=1700000000.0, last_time=1700000002.0, packet_count=20, total_bytes=2000)
     fv = FeatureExtractor().extract(flow)
-    anomaly = MLPrediction("isolation_forest_anomaly_detector", "THREAT_UNSUPERVISED_ANOMALY", -0.5, 0.99, True)
-    tunnel = MLPrediction("random_forest_threat_classifier", "THREAT_DNS_TUNNEL", 0.0, 0.99, True)
-    aggregator = EvidenceAggregator()
-    assert aggregator.ml_can_alert is False
-    assert aggregator.aggregate(flow, fv, [], [anomaly, tunnel]) == []
+    anomaly = MLPrediction("isolation_forest_flow_model", "THREAT_UNSUPERVISED_ANOMALY", 0.7, 0.99, True)
+    lgbm = MLPrediction("lightgbm_flow_classifier", "THREAT_ML_MALICIOUS_FLOW", 0.99, 0.99, True)
+    aggregator = EvidenceAggregator(ml_can_alert=False)
+    assert aggregator.aggregate(flow, fv, [], [anomaly, lgbm]) == []
 
     hit = RuleHit("dns_tunnel_detector", "THREAT_DNS_TUNNEL", "RULE_DNS_TUNNEL_VOLUME_LENGTH", "MEDIUM", 0.6)
-    (alert,) = aggregator.aggregate(flow, fv, [hit], [anomaly, tunnel])
+    (alert,) = aggregator.aggregate(flow, fv, [hit], [anomaly, lgbm])
     assert alert.confidence == 0.6 and alert.severity == "MEDIUM"
-    assert alert.detection["ml_scores"] == [0.99]
-    assert alert.to_dict()["model_version"].endswith("+ml-synthetic-baseline")
+    assert alert.detection["ml_scores"] == [0.99, 0.99]
+    assert "+ml-" in alert.to_dict()["model_version"]

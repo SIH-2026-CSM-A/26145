@@ -46,6 +46,12 @@ const CANONICAL_THREAT_CLASSES = [
     color: '#0891b2',
   },
   {
+    name: 'ML Malicious Flow',
+    keys: ['THREAT_ML_MALICIOUS_FLOW'],
+    psCategory: 'Supervised ML (LightGBM)',
+    color: '#9333ea',
+  },
+  {
     name: 'Unsupervised Anomaly',
     keys: ['THREAT_UNSUPERVISED_ANOMALY'],
     psCategory: 'Unsupervised ML Anomaly',

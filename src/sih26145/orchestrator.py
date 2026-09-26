@@ -68,7 +68,7 @@ class ThreatDetectionPipeline:
         if self.feature_sink is not None:
             self.feature_sink(flow, row)
         rule_hits = self.rule_suite.evaluate(fv, ctx)
-        ml_preds = self.ml_suite.predict(fv) if self.ml_suite is not None else []
+        ml_preds = self.ml_suite.predict(row) if self.ml_suite is not None else []
         alerts = self.aggregator.aggregate(flow=flow, fv=fv, rule_hits=rule_hits, ml_predictions=ml_preds)
         for alert in alerts:
             await self.storage.save_alert(alert)

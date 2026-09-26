@@ -1,0 +1,483 @@
+{
+  "split": "random",
+  "rows": 114700,
+  "positives": 31665,
+  "thresholds": {
+    "lgbm": {
+      "threshold": 0.5792091636070054,
+      "n_benign": 83035,
+      "budget_per_10k": 1.0,
+      "allowed_fp": 8,
+      "fp_at_threshold": 8
+    },
+    "iforest": {
+      "threshold": 0.6488222201914774,
+      "n_benign": 83035,
+      "budget_per_10k": 1.0,
+      "allowed_fp": 8,
+      "fp_at_threshold": 8
+    }
+  },
+  "out_of_fold": {
+    "pooled": {
+      "lgbm": {
+        "n": 114700,
+        "positives": 31665,
+        "benign": 83035,
+        "positive_share": 0.2761,
+        "pr_auc": 1.0,
+        "precision": 0.9997,
+        "recall": 0.9996,
+        "tp": 31652,
+        "fp": 8,
+        "fp_per_10k_benign": 0.96
+      },
+      "iforest": {
+        "n": 114700,
+        "positives": 31665,
+        "benign": 83035,
+        "positive_share": 0.2761,
+        "pr_auc": 0.8633,
+        "precision": 0.3846,
+        "recall": 0.0002,
+        "tp": 5,
+        "fp": 8,
+        "fp_per_10k_benign": 0.96
+      }
+    },
+    "pooled_ctu13": {
+      "lgbm": {
+        "n": 114700,
+        "positives": 31665,
+        "benign": 83035,
+        "positive_share": 0.2761,
+        "pr_auc": 1.0,
+        "precision": 0.9997,
+        "recall": 0.9996,
+        "tp": 31652,
+        "fp": 8,
+        "fp_per_10k_benign": 0.96
+      },
+      "iforest": {
+        "n": 114700,
+        "positives": 31665,
+        "benign": 83035,
+        "positive_share": 0.2761,
+        "pr_auc": 0.8633,
+        "precision": 0.3846,
+        "recall": 0.0002,
+        "tp": 5,
+        "fp": 8,
+        "fp_per_10k_benign": 0.96
+      }
+    },
+    "by_group": {
+      "ctu13-s1": {
+        "lgbm": {
+          "n": 72534,
+          "positives": 22928,
+          "benign": 49606,
+          "positive_share": 0.3161,
+          "pr_auc": 1.0,
+          "precision": 0.9998,
+          "recall": 0.9999,
+          "tp": 22925,
+          "fp": 4,
+          "fp_per_10k_benign": 0.81
+        },
+        "iforest": {
+          "n": 72534,
+          "positives": 22928,
+          "benign": 49606,
+          "positive_share": 0.3161,
+          "pr_auc": 0.8621,
+          "precision": 0.1429,
+          "recall": 0.0,
+          "tp": 1,
+          "fp": 6,
+          "fp_per_10k_benign": 1.21
+        }
+      },
+      "ctu13-s11": {
+        "lgbm": {
+          "n": 1044,
+          "positives": 28,
+          "benign": 1016,
+          "positive_share": 0.0268,
+          "pr_auc": 0.9988,
+          "precision": 1.0,
+          "recall": 0.8929,
+          "tp": 25,
+          "fp": 0,
+          "fp_per_10k_benign": 0.0
+        },
+        "iforest": {
+          "n": 1044,
+          "positives": 28,
+          "benign": 1016,
+          "positive_share": 0.0268,
+          "pr_auc": 0.2057,
+          "precision": null,
+          "recall": 0.0,
+          "tp": 0,
+          "fp": 0,
+          "fp_per_10k_benign": 0.0
+        }
+      },
+      "ctu13-s12": {
+        "lgbm": {
+          "n": 16161,
+          "positives": 3137,
+          "benign": 13024,
+          "positive_share": 0.1941,
+          "pr_auc": 1.0,
+          "precision": 0.9997,
+          "recall": 0.9984,
+          "tp": 3132,
+          "fp": 1,
+          "fp_per_10k_benign": 0.77
+        },
+        "iforest": {
+          "n": 16161,
+          "positives": 3137,
+          "benign": 13024,
+          "positive_share": 0.1941,
+          "pr_auc": 0.8842,
+          "precision": 1.0,
+          "recall": 0.0013,
+          "tp": 4,
+          "fp": 0,
+          "fp_per_10k_benign": 0.0
+        }
+      },
+      "ctu13-s5": {
+        "lgbm": {
+          "n": 7993,
+          "positives": 931,
+          "benign": 7062,
+          "positive_share": 0.1165,
+          "pr_auc": 1.0,
+          "precision": 0.9989,
+          "recall": 0.9989,
+          "tp": 930,
+          "fp": 1,
+          "fp_per_10k_benign": 1.42
+        },
+        "iforest": {
+          "n": 7993,
+          "positives": 931,
+          "benign": 7062,
+          "positive_share": 0.1165,
+          "pr_auc": 0.6829,
+          "precision": 0.0,
+          "recall": 0.0,
+          "tp": 0,
+          "fp": 1,
+          "fp_per_10k_benign": 1.42
+        }
+      },
+      "ctu13-s6": {
+        "lgbm": {
+          "n": 16968,
+          "positives": 4641,
+          "benign": 12327,
+          "positive_share": 0.2735,
+          "pr_auc": 1.0,
+          "precision": 0.9996,
+          "recall": 0.9998,
+          "tp": 4640,
+          "fp": 2,
+          "fp_per_10k_benign": 1.62
+        },
+        "iforest": {
+          "n": 16968,
+          "positives": 4641,
+          "benign": 12327,
+          "positive_share": 0.2735,
+          "pr_auc": 0.8854,
+          "precision": 0.0,
+          "recall": 0.0,
+          "tp": 0,
+          "fp": 1,
+          "fp_per_10k_benign": 0.81
+        }
+      }
+    },
+    "by_class": {
+      "benign-ctu13": {
+        "lgbm": {
+          "n": 83035,
+          "positives": 0,
+          "benign": 83035,
+          "positive_share": 0.0,
+          "pr_auc": null,
+          "precision": 0.0,
+          "recall": null,
+          "tp": 0,
+          "fp": 8,
+          "fp_per_10k_benign": 0.96
+        },
+        "iforest": {
+          "n": 83035,
+          "positives": 0,
+          "benign": 83035,
+          "positive_share": 0.0,
+          "pr_auc": null,
+          "precision": 0.0,
+          "recall": null,
+          "tp": 0,
+          "fp": 8,
+          "fp_per_10k_benign": 0.96
+        }
+      },
+      "ctu13-s1-neris-irc-spam-clickfraud": {
+        "lgbm": {
+          "n": 22928,
+          "positives": 22928,
+          "benign": 0,
+          "positive_share": 1.0,
+          "pr_auc": null,
+          "precision": 1.0,
+          "recall": 0.9999,
+          "tp": 22925,
+          "fp": 0,
+          "fp_per_10k_benign": null
+        },
+        "iforest": {
+          "n": 22928,
+          "positives": 22928,
+          "benign": 0,
+          "positive_share": 1.0,
+          "pr_auc": null,
+          "precision": 1.0,
+          "recall": 0.0,
+          "tp": 1,
+          "fp": 0,
+          "fp_per_10k_benign": null
+        }
+      },
+      "ctu13-s11-rbot-irc-icmp-ddos": {
+        "lgbm": {
+          "n": 28,
+          "positives": 28,
+          "benign": 0,
+          "positive_share": 1.0,
+          "pr_auc": null,
+          "precision": 1.0,
+          "recall": 0.8929,
+          "tp": 25,
+          "fp": 0,
+          "fp_per_10k_benign": null
+        },
+        "iforest": {
+          "n": 28,
+          "positives": 28,
+          "benign": 0,
+          "positive_share": 1.0,
+          "pr_auc": null,
+          "precision": null,
+          "recall": 0.0,
+          "tp": 0,
+          "fp": 0,
+          "fp_per_10k_benign": null
+        }
+      },
+      "ctu13-s12-nsisay-p2p": {
+        "lgbm": {
+          "n": 3137,
+          "positives": 3137,
+          "benign": 0,
+          "positive_share": 1.0,
+          "pr_auc": null,
+          "precision": 1.0,
+          "recall": 0.9984,
+          "tp": 3132,
+          "fp": 0,
+          "fp_per_10k_benign": null
+        },
+        "iforest": {
+          "n": 3137,
+          "positives": 3137,
+          "benign": 0,
+          "positive_share": 1.0,
+          "pr_auc": null,
+          "precision": 1.0,
+          "recall": 0.0013,
+          "tp": 4,
+          "fp": 0,
+          "fp_per_10k_benign": null
+        }
+      },
+      "ctu13-s5-virut-spam-portscan-http": {
+        "lgbm": {
+          "n": 931,
+          "positives": 931,
+          "benign": 0,
+          "positive_share": 1.0,
+          "pr_auc": null,
+          "precision": 1.0,
+          "recall": 0.9989,
+          "tp": 930,
+          "fp": 0,
+          "fp_per_10k_benign": null
+        },
+        "iforest": {
+          "n": 931,
+          "positives": 931,
+          "benign": 0,
+          "positive_share": 1.0,
+          "pr_auc": null,
+          "precision": null,
+          "recall": 0.0,
+          "tp": 0,
+          "fp": 0,
+          "fp_per_10k_benign": null
+        }
+      },
+      "ctu13-s6-donbot-portscan": {
+        "lgbm": {
+          "n": 4641,
+          "positives": 4641,
+          "benign": 0,
+          "positive_share": 1.0,
+          "pr_auc": null,
+          "precision": 1.0,
+          "recall": 0.9998,
+          "tp": 4640,
+          "fp": 0,
+          "fp_per_10k_benign": null
+        },
+        "iforest": {
+          "n": 4641,
+          "positives": 4641,
+          "benign": 0,
+          "positive_share": 1.0,
+          "pr_auc": null,
+          "precision": null,
+          "recall": 0.0,
+          "tp": 0,
+          "fp": 0,
+          "fp_per_10k_benign": null
+        }
+      }
+    }
+  },
+  "calibration_lgbm_oof": {
+    "brier": 0.00014,
+    "reliability": [
+      {
+        "bin": "0.0-0.1",
+        "n": 83023,
+        "mean_predicted": 0.0,
+        "observed_malicious": 0.0001
+      },
+      {
+        "bin": "0.1-0.2",
+        "n": 8,
+        "mean_predicted": 0.1437,
+        "observed_malicious": 0.5
+      },
+      {
+        "bin": "0.2-0.3",
+        "n": 3,
+        "mean_predicted": 0.2577,
+        "observed_malicious": 0.3333
+      },
+      {
+        "bin": "0.3-0.4",
+        "n": 2,
+        "mean_predicted": 0.3763,
+        "observed_malicious": 1.0
+      },
+      {
+        "bin": "0.5-0.6",
+        "n": 4,
+        "mean_predicted": 0.5591,
+        "observed_malicious": 0.25
+      },
+      {
+        "bin": "0.6-0.7",
+        "n": 4,
+        "mean_predicted": 0.6357,
+        "observed_malicious": 0.5
+      },
+      {
+        "bin": "0.7-0.8",
+        "n": 3,
+        "mean_predicted": 0.7391,
+        "observed_malicious": 0.6667
+      },
+      {
+        "bin": "0.8-0.9",
+        "n": 8,
+        "mean_predicted": 0.8337,
+        "observed_malicious": 0.75
+      },
+      {
+        "bin": "0.9-1.0",
+        "n": 31645,
+        "mean_predicted": 1.0,
+        "observed_malicious": 0.9999
+      }
+    ]
+  },
+  "calibration_lgbm_oof_ctu13": {
+    "brier": 0.00014,
+    "reliability": [
+      {
+        "bin": "0.0-0.1",
+        "n": 83023,
+        "mean_predicted": 0.0,
+        "observed_malicious": 0.0001
+      },
+      {
+        "bin": "0.1-0.2",
+        "n": 8,
+        "mean_predicted": 0.1437,
+        "observed_malicious": 0.5
+      },
+      {
+        "bin": "0.2-0.3",
+        "n": 3,
+        "mean_predicted": 0.2577,
+        "observed_malicious": 0.3333
+      },
+      {
+        "bin": "0.3-0.4",
+        "n": 2,
+        "mean_predicted": 0.3763,
+        "observed_malicious": 1.0
+      },
+      {
+        "bin": "0.5-0.6",
+        "n": 4,
+        "mean_predicted": 0.5591,
+        "observed_malicious": 0.25
+      },
+      {
+        "bin": "0.6-0.7",
+        "n": 4,
+        "mean_predicted": 0.6357,
+        "observed_malicious": 0.5
+      },
+      {
+        "bin": "0.7-0.8",
+        "n": 3,
+        "mean_predicted": 0.7391,
+        "observed_malicious": 0.6667
+      },
+      {
+        "bin": "0.8-0.9",
+        "n": 8,
+        "mean_predicted": 0.8337,
+        "observed_malicious": 0.75
+      },
+      {
+        "bin": "0.9-1.0",
+        "n": 31645,
+        "mean_predicted": 1.0,
+        "observed_malicious": 0.9999
+      }
+    ]
+  }
+}

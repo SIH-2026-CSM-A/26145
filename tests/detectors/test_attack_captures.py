@@ -22,7 +22,10 @@ async def alerts_for(tmp_path, packets):
 
 
 def by_rule(alerts):
-    return collections.Counter((a.threat_class, a.detection["rule_matches"][0]) for a in alerts)
+    """Rule alerts by (class, rule). ML-only alerts are left out: on an attack capture a model
+    flagging attack flows is a true positive, not a cross-fire between detectors."""
+    return collections.Counter((a.threat_class, a.detection["rule_matches"][0])
+                               for a in alerts if a.detector["type"] != "ML")
 
 
 @pytest.mark.asyncio
