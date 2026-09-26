@@ -328,13 +328,38 @@ save with an existing `alert_id` is refused.
 
 ## 12. API and dashboard
 
-FastAPI, read-only `GET` routes under `/api/v1`: `health`, `metrics`, `alerts`,
-`alerts/{alert_id}`, `stream/alerts` (SSE). CORS limited to the local dashboard origins,
-`GET` only. SSE (server → dashboard) is the only push channel; WebSockets are not used.
+FastAPI, read-only `GET` routes under `/api/v1`:
+- `health`, `metrics`, `alerts`, `alerts/{alert_id}`;
+- `campaigns`, `campaigns/{id}`, `hosts/{ip}/timeline`;
+- `contract` (feature states), `chain/verify`;
+- `stream/alerts` (SSE: `alert` events, plus `reset` when a demo loop restarts).
 
-React + Vite dashboard: live alert table and evidence drawer (showing
-`observability_state` and substitutions), link-visibility gauge, and a Cytoscape.js
-campaign graph (hosts as nodes, alerts as edges, grouped by `campaign_id`).
+**Read-only surface.** The app has no write, upload, analyze or reset route. Every other
+method gets 405, including on the static mount (`tests/api/test_readonly_surface.py`). There is
+no CORS middleware: the built dashboard is served by the same app at `/`, and Vite dev proxies
+`/api`, so browsers refuse cross-origin reads. SSE (server → dashboard) is the only push
+channel.
+
+**Dashboard** (React + Vite, all JS/CSS bundled, system fonts, no request leaves the origin; the
+smoke test fails if one does):
+- **Facts strip** from `/metrics`: flows/s, Mbps, queue drops, link reverse visibility, the
+  replayed capture and speed, and "Bytes sent onto the monitored link: 0". The last one is true
+  by construction: `tests/ingest/test_no_transmit.py` fails if the capture or ingest path gains a
+  socket, a send or a writable `open`.
+- **Cytoscape.js campaign graph:** hosts and the other ends as nodes, alerts as class-coloured
+  edges, campaigns as compound boxes (the newest 12). The campaign list shows refused merges.
+- **Host timeline:** click a node to see its observed ATT&CK stages.
+- **Alert drawer:** click an edge or alert to see:
+  - the class in plain words, severity, and the evidence (value against normal or threshold);
+  - contract chips (computable / degraded / substituted / unavailable);
+  - the flow's observability in words;
+  - the ML top features;
+  - `record_hash` with the chain-verified badge.
+- **Model card:** its figures are quoted from `docs/MODELS.md`, and
+  `tests/training/test_model_card_facts.py` fails on drift.
+- **Checks:** `scripts/smoke.sh` builds the UI, serves a generated capture and runs the headless
+  Playwright smoke test (`dashboard/tests/smoke.mjs`): the graph renders, and clicking an edge
+  opens the drawer.
 
 ## 13. Measurement policy
 

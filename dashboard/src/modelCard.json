@@ -1,0 +1,20 @@
+{
+  "title": "LightGBM flow model: what it is and what it is not",
+  "source": "docs/MODELS.md",
+  "items": [
+    {"label": "Trained on", "text": "Header-only CTU-13-Extended captures (5 scenarios): 31,665 malicious and 83,035 benign flows.",
+     "facts": ["31,665 malicious and 83,035 benign flows"]},
+    {"label": "Validated by", "text": "Leave one CTU-13 scenario out: every score comes from a model that never saw that capture.",
+     "facts": ["leave one CTU-13 scenario out"]},
+    {"label": "Alert budget", "text": "Threshold set for 1 ML-only false positive per 10,000 benign flows.",
+     "facts": ["1 ML-only false positive per 10,000 benign flows"]},
+    {"label": "Held-out result", "text": "PR-AUC 0.9704, but recall at the budget only 0.2818 (pooled, scenario held out). s6 DonBot and s11 Rbot get 0 recall held out.",
+     "facts": ["0.9704", "0.2818", "s6 DonBot and s11 Rbot get 0 recall held out"]},
+    {"label": "Cannot see", "text": "They never see DNS names, TLS fingerprints or payload. DGA, DNS tunnel and encrypted-session alerts come from the rules.",
+     "facts": ["They never see DNS names, TLS fingerprints or payload"]},
+    {"label": "Guard rails", "text": "ML-only alerts are capped at MEDIUM. The IsolationForest corroborates only; it never alerts alone.",
+     "facts": ["ML-only alerts are capped at MEDIUM", "Corroborates only"]},
+    {"label": "Known failure modes", "text": "Unanswered TCP connections look malicious. Training traffic is a 2011 university network.",
+     "facts": ["Unanswered TCP connections look malicious", "Training traffic is a 2011 university network"]}
+  ]
+}

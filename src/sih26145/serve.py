@@ -7,6 +7,7 @@ produced; /api/v1/metrics reads the running pipeline's counters.
 import asyncio
 import importlib
 import logging
+import os
 from typing import Optional
 
 import uvicorn
@@ -27,6 +28,7 @@ async def serve(pcap: str, speed: Optional[float] = 1.0, host: str = "127.0.0.1"
     server = uvicorn.Server(uvicorn.Config(api.app, host=host, port=port, log_level="info"))
     pipeline = ThreatDetectionPipeline(storage=api.storage, publish=api.broadcaster.broadcast)
     metrics = api.pipeline_metrics = PipelineMetrics(queue_max)
+    api.source = {"capture": os.path.basename(pcap), "speed": speed, "loop": None}
 
     async def replay():
         while not server.started:  # the API lifespan opens the shared storage first

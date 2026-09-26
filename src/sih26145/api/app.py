@@ -4,9 +4,13 @@ import asyncio
 import json
 from contextlib import asynccontextmanager
 from typing import List, Dict, Any, Optional, Set
+from pathlib import Path as FsPath
+
 from fastapi import FastAPI, Query, HTTPException, Path
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
+
+from sih26145.contract import load_contract
 
 from sih26145.alerts.models import Alert
 from sih26145.storage.database import AlertStorage
@@ -29,14 +33,18 @@ class AlertBroadcaster:
         """Remove subscriber queue on disconnect."""
         self._subscribers.discard(q)
 
-    def broadcast(self, alert_dict: Dict[str, Any]):
-        """Publish alert dictionary to all active subscribers without blocking."""
+    def broadcast(self, alert_dict: Dict[str, Any], event: str = "alert"):
+        """Publish an event (an alert dict by default) to all subscribers without blocking."""
         for q in list(self._subscribers):
             try:
-                q.put_nowait(alert_dict)
+                q.put_nowait((event, alert_dict))
             except asyncio.QueueFull:
                 # Drop for slow consumers to prevent memory leaks under backpressure
                 pass
+
+    def reset(self, info: Dict[str, Any]):
+        """Tell dashboards a new replay loop started with an empty store (`serve --loop`)."""
+        self.broadcast(info, event="reset")
 
     @property
     def subscriber_count(self) -> int:
@@ -50,6 +58,8 @@ storage = AlertStorage(db_env if db_env else ":memory:")
 broadcaster = AlertBroadcaster()
 # Set by `sih26145 serve` to the running pipeline's PipelineMetrics; None = nothing running.
 pipeline_metrics = None
+# Set by `sih26145 serve`: what is being replayed, so the dashboard can say so.
+source = None
 METRIC_FIELDS = ("pipeline_state", "active_flows", "flows_per_sec", "mbps", "packets_per_sec", "rate_window_s",
                  "queue_depth", "queue_max", "drops", "flows_scored", "link_reverse_visibility_w", "alert_latency_ms")
 
@@ -76,22 +86,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Enable CORS for local read-only monitoring dashboard requests (Phase 11 frontend)
-# Note: IMPLEMENTATION DECISION — NOT ARCHITECTURE REQUIREMENT
-ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=False,
-    allow_methods=["GET"],
-    allow_headers=["*"],
-)
+# No CORS middleware: the dashboard is served from this origin (and Vite dev proxies /api), so
+# browsers refuse cross-origin reads. Every route is GET; anything else gets 405.
 
 
 @app.get("/api/v1/health")
@@ -148,9 +144,18 @@ async def get_metrics():
     return {
         **snap,
         "telemetry_source": "pipeline" if pipeline_metrics is not None else "not_connected",
+        "source": source,
         "total_alerts": await storage.count_alerts(),
         "mode": "PASSIVE_READ_ONLY",
     }
+
+
+@app.get("/api/v1/contract")
+async def get_contract():
+    """Feature states from the Unidirectional Feature Contract, for the dashboard's evidence chips."""
+    c = load_contract()
+    return {"contract_version": c.version,
+            "features": {n: {"state": f.state, "reason": f.reason} for n, f in c.features.items()}}
 
 
 @app.get("/api/v1/campaigns")
@@ -190,10 +195,10 @@ async def stream_alerts():
         try:
             while True:
                 try:
-                    alert_dict = await asyncio.wait_for(subscriber_queue.get(), timeout=15.0)
+                    event, payload = await asyncio.wait_for(subscriber_queue.get(), timeout=15.0)
                     yield {
-                        "event": "alert",
-                        "data": json.dumps(alert_dict),
+                        "event": event,
+                        "data": json.dumps(payload),
                     }
                 except asyncio.TimeoutError:
                     # Periodic heartbeat ping to keep connection active
@@ -205,3 +210,9 @@ async def stream_alerts():
             broadcaster.unsubscribe(subscriber_queue)
 
     return EventSourceResponse(event_generator())
+
+
+# The built dashboard (dashboard/dist), same origin as the API. Mounted last so /api wins.
+DIST = FsPath(__file__).resolve().parents[3] / "dashboard" / "dist"
+if (DIST / "index.html").exists():
+    app.mount("/", StaticFiles(directory=DIST, html=True), name="dashboard")
