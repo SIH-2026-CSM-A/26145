@@ -5,6 +5,27 @@ import { classInfo } from '../lib/labels';
 // Hosts and destinations are nodes, alerts are edges (one per campaign/src/dst/class, with a
 // count), campaigns are compound parents. A destination seen by two campaigns is drawn once
 // in each: the campaign boxes stay separate, as the correlator decided.
+// Deterministic layout: one grid cell per campaign (oldest first, so live updates never
+// reshuffle), its host(s) in the middle and the other ends on a ring around them.
+const CELL_W = 460, CELL_H = 400;
+
+function place(nodes, shown) {
+  const cols = Math.max(1, Math.ceil(Math.sqrt(shown.length * 1.8)));
+  const order = [...shown].sort((a, b) => (a.first_seen < b.first_seen ? -1 : a.first_seen > b.first_seen ? 1 : 0));
+  order.forEach((c, i) => {
+    const cx = (i % cols) * CELL_W, cy = Math.floor(i / cols) * CELL_H;
+    const kids = [...nodes.values()].filter((n) => n.data.campaign === c.campaign_id && n.data.kind !== 'campaign');
+    const hosts = kids.filter((n) => n.data.kind === 'host');
+    const remotes = kids.filter((n) => n.data.kind === 'remote');
+    hosts.forEach((n, j) => { n.position = { x: cx + (j - (hosts.length - 1) / 2) * 110, y: cy }; });
+    const r = 150 + 8 * Math.max(0, remotes.length - 4);
+    remotes.forEach((n, k) => {
+      const a = -Math.PI / 2 + (2 * Math.PI * k) / Math.max(remotes.length, 1) + (remotes.length === 1 ? Math.PI / 4 : 0);
+      n.position = { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+    });
+  });
+}
+
 export function buildElements(alerts, campaigns, maxCampaigns = 12) {
   const shown = campaigns.slice(0, maxCampaigns);
   const keep = new Set(shown.map((c) => c.campaign_id));
@@ -36,6 +57,7 @@ export function buildElements(alerts, campaigns, maxCampaigns = 12) {
     e.data.label = `${classInfo(a.threat_class).short}${e.data.count > 1 ? ` ×${e.data.count}` : ''}`;
     edges.set(eid, e);
   }
+  place(nodes, shown);
   return [...nodes.values(), ...edges.values()];
 }
 
@@ -68,7 +90,7 @@ export default function CampaignGraph({ elements, selectedCampaign, onPickEdge, 
   handlers.current = { onPickEdge, onPickHost };
 
   useEffect(() => {
-    cy.current = cytoscape({ container: box.current, style: STYLE, wheelSensitivity: 0.2, minZoom: 0.2, maxZoom: 3 });
+    cy.current = cytoscape({ container: box.current, style: STYLE, wheelSensitivity: 0.2, minZoom: 0.2, maxZoom: 1.4 });
     cy.current.on('tap', 'edge', (e) => {
       cy.current.elements().removeClass('picked');
       e.target.addClass('picked');
@@ -91,15 +113,13 @@ export default function CampaignGraph({ elements, selectedCampaign, onPickEdge, 
       g.elements().forEach((el) => { if (!want.has(el.id())) el.remove(); });
       for (const [id, el] of want) {
         const cur = g.getElementById(id);
-        if (cur.nonempty()) cur.data(el.data);
-        else { g.add(el); added = true; }
+        if (cur.nonempty()) {
+          cur.data(el.data);
+          if (el.position) cur.position(el.position);
+        } else { g.add(el); added = true; }
       }
     });
-    if (added) {
-      g.layout({ name: 'cose', animate: false, randomize: false, nodeDimensionsIncludeLabels: true,
-                 idealEdgeLength: () => 150, nodeRepulsion: () => 12000, componentSpacing: 30, padding: 20 }).run();
-      g.fit(undefined, 30);
-    }
+    if (added) g.fit(undefined, 40);
   }, [elements]);
 
   useEffect(() => {

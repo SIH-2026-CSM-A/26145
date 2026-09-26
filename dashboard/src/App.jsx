@@ -75,7 +75,7 @@ export default function App() {
     <div className="h-screen flex flex-col bg-slate-950 text-slate-100">
       <FactsStrip metrics={metrics} live={live} chain={chain} onModelCard={() => setShowCard(true)} />
       <div className="flex-1 min-h-0 grid grid-cols-[minmax(260px,300px)_1fr]">
-        <div className="flex flex-col min-h-0">
+        <div className="flex flex-col min-h-0 bg-slate-900/60">
           <CampaignList campaigns={campaigns} selected={selectedCampaign} shownCount={Math.min(campaigns.length, GRAPH_CAMPAIGNS)}
                         onSelect={(c) => setSelectedCampaign((cur) => (cur === c ? null : c))} />
           <section className="border-t border-r border-slate-800 bg-slate-900/60 h-[34%] min-h-[150px] flex flex-col">
@@ -108,7 +108,7 @@ export default function App() {
               </div>
             </div>
           )}
-          <div className="absolute top-2 left-2 bg-slate-900/85 ring-1 ring-slate-800 rounded-lg px-2.5 py-1.5 text-[10px] pointer-events-none" data-testid="legend">
+          <div className="absolute bottom-2 left-2 bg-slate-900/85 ring-1 ring-slate-800 rounded-lg px-2.5 py-1.5 text-[10px] pointer-events-none" data-testid="legend">
             <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
               {Object.entries(CLASS_INFO).map(([k, v]) => (
                 <div key={k} className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded" style={{ background: v.color }} /><span className="text-slate-300">{v.short}</span></div>
