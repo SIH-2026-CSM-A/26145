@@ -215,8 +215,10 @@ pivots it joined on, refused pivots, and refused merges. These fields are inside
   - The port class supports a join but never makes one alone.
   - Ties go to the older campaign, and campaigns never merge with each other.
 - **Common infrastructure never merges:**
-  - A shared resolver (a port-53 destination with ≥ 5 long-term sources) is refused.
-  - So are the top 10 destinations by long-term fan-in (fan-in ≥ 5).
+  - A shared resolver (a port-53 destination with ≥ 5 long-term sources) is refused as a
+    destination pivot.
+  - So are the top 10 destinations by long-term fan-in (fan-in ≥ 5). Only destination pivots
+    are refused: a busy workstation that receives replies from many servers is still one host.
   - The refused merge is recorded, for example "not merged: shared resolver 10.0.0.53".
 - **`campaign_id`** is `camp-` + the first 12 hex characters of sha256 of the first alert's
   (flow_id, event time, class). It is deterministic across runs.

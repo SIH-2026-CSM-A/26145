@@ -65,6 +65,23 @@ def test_shared_name_still_joins_through_the_resolver():
     assert b.detection["correlation"]["joined_on"] == ["name:kqxw.com"]
 
 
+def test_a_busy_host_is_not_refused_as_infrastructure():
+    """Fan-in refusal is for destinations: a workstation that receives replies from many servers
+    (high fan-in as a destination) still joins its own alerts through its host pivot."""
+    host = "10.9.9.9"  # internal under the default CIDRs
+    fan = {host: 60.0}
+    a, _ = dns_alert(host, ["x.example"], 1000.0, fan)
+    b, _ = dns_alert(host, ["y.example"], 1015.0, fan)
+    ctx_a = Ctx(FlowRecord(FlowKey(host, "195.24.233.55", 443, "TCP", 1), 999.0, 1000.0), fan)
+    ctx_b = Ctx(FlowRecord(FlowKey("74.125.232.214", host, 50000, "TCP", 443), 1014.0, 1015.0), fan)
+    c = Correlator()
+    for alert, ctx in ((a, ctx_a), (b, ctx_b)):
+        c._observe_fan_in(host, ctx)  # the host is in the top-k fan-in set
+        c.assign([alert], c.observe(ctx))
+    assert a.campaign_id == b.campaign_id
+    assert b.detection["correlation"]["joined_on"] == [f"host:{host}"]
+
+
 def test_memory_is_bounded():
     c = Correlator()
     for i in range(3000):

@@ -15,7 +15,7 @@ least 2 rare pivots, or 1 rare pivot and the campaign's last alert is at most PR
 in event time. The port class supports a join but is never the only rare pivot. Ties go to the
 older campaign. Campaigns never merge with each other.
 
-Common infrastructure never merges: an IP pivot is refused when it is a shared resolver (port-53
+Common infrastructure never merges: a destination pivot is refused when it is a shared resolver (port-53
 destination with >= RESOLVER_FAN_IN distinct sources ever seen) or among the TOP_K destinations by
 fan-in seen in alerts (fan-in >= MIN_TOP_FAN_IN). A refused destination takes its port class with
 it. A join that only the refused pivot would have made is recorded on the alert
@@ -122,8 +122,8 @@ class Correlator:
         store update), so the result does not depend on how flows were batched."""
         piv = self._pivots(ctx)
         refused: Dict[str, str] = {}
-        for p, kind in piv.items():
-            if kind == "ip":
+        for p in piv:
+            if p.startswith("dst:"):  # a host that receives many replies is still one host
                 why = self._common(p.split(":", 1)[1], ctx)
                 if why:
                     refused[p] = why
