@@ -153,6 +153,12 @@ async def get_metrics():
     }
 
 
+@app.get("/api/v1/chain/verify")
+async def verify_chain():
+    """Recompute the alert log's hash chain (storage/chain.py): {ok, n, first_bad_index, reason, head}."""
+    return await storage.verify_chain()
+
+
 @app.get("/api/v1/stream/alerts")
 async def stream_alerts():
     """Server-Sent Events (SSE) live event stream pushing alerts to connected clients."""

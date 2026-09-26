@@ -54,7 +54,7 @@ async def test_v1_database_is_upgraded_in_place(tmp_path):
     assert row["observability_state"] is None and row["contract_version"] is None
 
     con = sqlite3.connect(path)
-    assert con.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert con.execute("PRAGMA user_version").fetchone()[0] == 3
     assert con.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
     assert con.execute("SELECT schema_version, flow_id FROM alerts").fetchone() == ("2.0", row["flow_id"])
     con.close()

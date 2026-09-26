@@ -16,6 +16,9 @@ dependencies = [
     "uvicorn>=0.53.0",
 ]
 
+[project.scripts]
+sih26145 = "sih26145.cli:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

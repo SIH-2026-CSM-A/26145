@@ -157,3 +157,9 @@ def test_metrics_report_only_measured_values(client):
         assert data[field] is None, field
     assert data["telemetry_source"] == "not_connected"
     assert isinstance(data["total_alerts"], int)
+
+
+def test_chain_verify_endpoint_reports_the_live_log(client):
+    res = client.get("/api/v1/chain/verify").json()
+    assert res["ok"] is True and res["first_bad_index"] is None
+    assert res["n"] == client.get("/api/v1/metrics").json()["total_alerts"]

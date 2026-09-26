@@ -259,8 +259,31 @@ replay clock the timer flushes on ingested event time, so late packets do not sp
 ## 11. Storage
 
 SQLite, WAL journal mode (readers never block the single writer). Schema version is
-tracked in `PRAGMA user_version`; migrations run on open. Indexed columns: timestamp,
-threat_class, severity, flow_id. No DELETE path.
+tracked in `PRAGMA user_version` (3); migrations run on open. Indexed columns: timestamp,
+threat_class, severity, flow_id, campaign_id, seq. No DELETE path, and no REPLACE: a second
+save with an existing `alert_id` is refused.
+
+**Tamper-evident log** (`storage/chain.py`).
+- **The chain.** Each row stores `seq`, `prev_hash` and `record_hash`, where
+  `record_hash = SHA-256(prev_hash || canonical JSON of the alert v2 without record_hash)`:
+  - both hashes are hex;
+  - canonical JSON has sorted keys, `","`/`":"` separators and UTF-8;
+  - the **genesis** `prev_hash` is 64 zeros;
+  - `record_hash` is also written into the alert JSON.
+- **Verification.** `sih26145 verify-log --db PATH` (and `GET /api/v1/chain/verify`) recomputes
+  the chain. It also checks that the indexed columns equal the hashed JSON, and reports the
+  first broken index. An edit to any field, a deleted row or a reordering is caught there.
+- **The tail.** A truncated tail can only be caught against an exported `chain_head.txt`.
+- **Migration.** Rows present before the v3 migration are chained at migration time, so the
+  chain attests to them from then on.
+- **Export.** `sih26145 export --db PATH --out DIR` writes a one-way transfer bundle:
+  - `alerts.jsonl`;
+  - `chain_head.txt`;
+  - `manifest.json`: counts, time range, versions, and the sha256 of `alerts.jsonl`;
+  - `section63_datasheet.md`: the facts for a certificate under Section 63 of the Bharatiya
+    Sakshya Adhiniyam, 2023 (Part A/Part B structure). It is a data sheet, not legal advice.
+
+  The export refuses a log whose chain does not verify.
 
 ## 12. API and dashboard
 

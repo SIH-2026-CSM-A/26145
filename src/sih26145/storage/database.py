@@ -5,8 +5,9 @@ import os
 import aiosqlite
 from typing import List, Dict, Any, Optional
 from sih26145.alerts.models import Alert, upgrade_v1_dict
+from sih26145.storage.chain import GENESIS, ROW_SQL, record_hash, verify_rows
 
-SCHEMA_VERSION = 2  # PRAGMA user_version once all migrations have run
+SCHEMA_VERSION = 3  # PRAGMA user_version once all migrations have run
 DB_PATH_ENV = "SIH26145_DB_PATH"
 
 
@@ -17,6 +18,8 @@ class AlertStorage:
         self.db_path = db_path or os.getenv(DB_PATH_ENV) or "alerts.db"
         self._conn: Optional[aiosqlite.Connection] = None
         self._initialized = False
+        self._head = GENESIS  # record_hash of the last stored alert (storage/chain.py)
+        self._seq = 0
 
     async def get_connection(self) -> aiosqlite.Connection:
         """Get or create persistent database connection."""
@@ -49,11 +52,18 @@ class AlertStorage:
             (version,) = await cur.fetchone()
         if version < 2:
             await self._migrate_v1_to_v2(conn)
+        if version < 3:
+            await self._migrate_v2_to_v3(conn)
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_timestamp ON alerts(timestamp DESC)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_threat_class ON alerts(threat_class)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_severity ON alerts(severity)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_flow_id ON alerts(flow_id)")
+        await conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_campaign ON alerts(campaign_id)")
+        await conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_alerts_seq ON alerts(seq)")
         await conn.commit()
+        async with conn.execute("SELECT seq, record_hash FROM alerts ORDER BY seq DESC LIMIT 1") as cur:
+            last = await cur.fetchone()
+        self._seq, self._head = (last[0] + 1, last[1]) if last else (0, GENESIS)
         self._initialized = True
 
     async def _migrate_v1_to_v2(self, conn: aiosqlite.Connection):
@@ -80,32 +90,82 @@ class AlertStorage:
             await conn.rollback()
             raise
 
+    async def _migrate_v2_to_v3(self, conn: aiosqlite.Connection):
+        """Hash chain columns. Rows already stored are chained now, in insertion order: the chain
+        attests to them from this migration on, not from when they were written."""
+        await conn.execute("BEGIN")
+        try:
+            for col in ("seq INTEGER", "prev_hash TEXT", "record_hash TEXT", "campaign_id TEXT"):
+                await conn.execute(f"ALTER TABLE alerts ADD COLUMN {col}")
+            async with conn.execute("SELECT rowid, json_data FROM alerts ORDER BY rowid") as cur:
+                rows = await cur.fetchall()
+            prev = GENESIS
+            for seq, (rowid, raw) in enumerate(rows):
+                try:
+                    d = json.loads(raw)
+                except (ValueError, TypeError):
+                    d = {"unreadable_json_data": raw}  # chained as found, never dropped
+                d["record_hash"] = h = record_hash(prev, d)
+                # v2 stored the unrounded confidence in its column; the hashed JSON's value wins
+                await conn.execute(
+                    "UPDATE alerts SET seq = ?, prev_hash = ?, record_hash = ?, campaign_id = ?, json_data = ?, "
+                    "confidence = COALESCE(?, confidence) WHERE rowid = ?",
+                    (seq, prev, h, d.get("campaign_id"), json.dumps(d), d.get("confidence"), rowid))
+                prev = h
+            await conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+            await conn.commit()
+        except Exception:
+            await conn.rollback()
+            raise
+
     async def save_alert(self, alert: Alert) -> str:
-        """Save a structured Alert into SQLite database using parameterized query."""
+        """Append an alert to the hash chain (storage/chain.py). Plain INSERT: a chained row is
+        never replaced; a duplicate alert_id is an error."""
         await self.init_db()
         conn = await self.get_connection()
+        alert.record_hash = None
+        alert.record_hash = record_hash(self._head, alert.to_dict())
         alert_dict = alert.to_dict()
+        try:
+            await self._insert(conn, alert, alert_dict)
+        except Exception:
+            await conn.rollback()
+            raise
+        self._seq, self._head = self._seq + 1, alert.record_hash
+        return alert.alert_id
+
+    async def _insert(self, conn, alert: Alert, alert_dict: dict) -> None:
         await conn.execute(
             """
-            INSERT OR REPLACE INTO alerts
+            INSERT INTO alerts
                 (alert_id, timestamp, threat_class, severity, confidence, json_data,
-                 schema_version, flow_id, observability_state)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 schema_version, flow_id, observability_state, seq, prev_hash, record_hash, campaign_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 alert.alert_id,
-                alert.timestamp,
+                alert_dict["timestamp"],
                 alert.threat_class,
                 alert.severity,
-                float(alert.confidence),
+                alert_dict["confidence"],
                 json.dumps(alert_dict),
                 alert.version,
                 alert.flow_id,
                 alert.observability_state,
+                self._seq,
+                self._head,
+                alert.record_hash,
+                alert.campaign_id,
             ),
         )
         await conn.commit()
-        return alert.alert_id
+
+    async def verify_chain(self) -> dict:
+        """Recompute the whole chain (storage/chain.verify_rows) on this connection."""
+        await self.init_db()
+        conn = await self.get_connection()
+        async with conn.execute(ROW_SQL) as cur:
+            return verify_rows(await cur.fetchall())
 
     async def count_alerts(self) -> int:
         await self.init_db()
@@ -172,3 +232,4 @@ class AlertStorage:
             await self._conn.close()
             self._conn = None
             self._initialized = False
+            self._head, self._seq = GENESIS, 0

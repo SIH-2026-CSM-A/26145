@@ -82,7 +82,10 @@ async def test_sqlite_sql_injection_defense():
 
 
 @pytest.mark.asyncio
-async def test_sqlite_duplicate_alert_id_replace_behavior():
+async def test_sqlite_duplicate_alert_id_is_refused_not_replaced():
+    """A chained record is never overwritten (storage/chain.py): a second save with the same
+    alert_id raises, and the first record and the chain stay intact."""
+    import sqlite3
     db = AlertStorage(":memory:")
     await db.init_db()
 
@@ -110,13 +113,15 @@ async def test_sqlite_duplicate_alert_id_replace_behavior():
         alert_id=alert_id,
     )
 
-    await db.save_alert(alert2)
+    with pytest.raises(sqlite3.IntegrityError):
+        await db.save_alert(alert2)
 
     records = await db.get_alerts(threat_class="THREAT_RECON_PORTSCAN")
     assert len(records) == 1
-    assert records[0]["confidence"] == 0.99
-    assert records[0]["severity"] == "HIGH"
-    assert records[0]["detection"]["attempt"] == 2
+    assert records[0]["confidence"] == 0.85
+    assert records[0]["severity"] == "MEDIUM"
+    assert records[0]["detection"]["attempt"] == 1
+    assert (await db.verify_chain())["ok"]
 
     await db.close()
 

@@ -37,7 +37,29 @@ def main():
     dump_parser.add_argument("pcap_file", type=str, help="Capture to replay (unthrottled, lossless)")
     dump_parser.add_argument("--out", required=True, help="Output .csv.gz path")
 
+    verify_parser = subparsers.add_parser("verify-log", help="Recompute the alert log's hash chain")
+    verify_parser.add_argument("--db", required=True, help="SQLite alert database")
+    export_parser = subparsers.add_parser("export", help="Write a one-way transfer bundle of the alert log")
+    export_parser.add_argument("--db", required=True, help="SQLite alert database")
+    export_parser.add_argument("--out", required=True, help="Output directory")
+
     args = parser.parse_args()
+    if args.command in ("verify-log", "export"):
+        from sih26145.storage import chain
+        if args.command == "verify-log":
+            res = chain.verify(args.db)
+            if res["ok"]:
+                print(f"verified: {res['n']} records, chain head {res['head']}")
+                return
+            print(f"BROKEN at index {res['first_bad_index']} of {res['rows']}: {res['reason']}")
+            sys.exit(1)
+        try:
+            m = chain.export(args.db, args.out)
+        except ValueError as e:
+            print(f"refused: {e}")
+            sys.exit(1)
+        print(f"exported {m['alerts']} alerts to {args.out}; alerts.jsonl sha256 {m['alerts_jsonl_sha256']}")
+        return
     if args.command == "dump-features":
         import json
         from sih26145.features.dump import dump_features
