@@ -153,6 +153,28 @@ async def get_metrics():
     }
 
 
+@app.get("/api/v1/campaigns")
+async def get_campaigns():
+    """Campaigns (correlate.py) with hosts, classes, ATT&CK tactics, time span and refused merges."""
+    camps = await storage.get_campaigns()
+    return {"count": len(camps), "campaigns": camps}
+
+
+@app.get("/api/v1/campaigns/{campaign_id}")
+async def get_campaign(campaign_id: str = Path(..., max_length=64)):
+    alerts = await storage.get_campaign_alerts(campaign_id)
+    if not alerts:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    summary = next((c for c in await storage.get_campaigns() if c["campaign_id"] == campaign_id), None)
+    return {"campaign": summary, "alerts": alerts}
+
+
+@app.get("/api/v1/hosts/{ip}/timeline")
+async def get_host_timeline(ip: str = Path(..., max_length=45)):
+    """Observed ATT&CK stages of one internal host, oldest first. History only: no prediction."""
+    return {"host": ip, "stages": await storage.host_timeline(ip)}
+
+
 @app.get("/api/v1/chain/verify")
 async def verify_chain():
     """Recompute the alert log's hash chain (storage/chain.py): {ok, n, first_bad_index, reason, head}."""

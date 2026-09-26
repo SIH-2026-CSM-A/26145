@@ -5,6 +5,7 @@ from typing import Callable, List, Optional
 
 from sih26145.alerts.aggregator import EvidenceAggregator
 from sih26145.alerts.models import Alert
+from sih26145.correlate import Correlator
 from sih26145.detectors.context import DetectionContext
 from sih26145.detectors.rules.suite import RuleDetectorSuite
 from sih26145.features.directional import NetworkPolicy
@@ -40,6 +41,7 @@ class ThreatDetectionPipeline:
         self.publish = publish
         self.policy = NetworkPolicy.from_env()
         self.feature_store = FeatureStore(policy=self.policy)
+        self.correlator = Correlator()
         self.last_metrics = None
 
     async def init(self):
@@ -75,12 +77,13 @@ class ThreatDetectionPipeline:
             row = model_row(fv, ctx)
             if self.feature_sink is not None:
                 self.feature_sink(flow, row)
-            staged.append((flow, fv, row, self.rule_suite.evaluate(fv, ctx)))
+            staged.append((flow, fv, row, self.rule_suite.evaluate(fv, ctx), self.correlator.observe(ctx)))
         preds = (self.ml_suite.predict_batch([s[2] for s in staged]) if self.ml_suite is not None
                  else [[] for _ in staged])
         out = []
-        for (flow, fv, _, rule_hits), ml_preds in zip(staged, preds):
+        for (flow, fv, _, rule_hits, pivots), ml_preds in zip(staged, preds):
             alerts = self.aggregator.aggregate(flow=flow, fv=fv, rule_hits=rule_hits, ml_predictions=ml_preds)
+            self.correlator.assign(alerts, pivots)
             for alert in alerts:
                 await self.storage.save_alert(alert)
                 if self.publish is not None:

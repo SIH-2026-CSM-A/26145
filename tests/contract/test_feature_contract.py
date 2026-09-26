@@ -75,6 +75,14 @@ def test_feature_dump_reads_match_declaration():
     assert reads == set(contract.consumer("feature_dump").reads)
 
 
+def test_correlator_reads_match_declaration():
+    import sih26145.correlate as correlate
+    contract = load_contract()
+    reads = scan_reads(ast.parse(inspect.getsource(correlate)))
+    assert contract.read_violations("campaign_correlator", reads) == []
+    assert reads == set(contract.consumer("campaign_correlator").reads)
+
+
 def test_every_feature_vector_field_is_declared():
     contract = load_contract()
     fields = {f.name for f in dataclasses.fields(FeatureVector)} - {"flow_key_str"}

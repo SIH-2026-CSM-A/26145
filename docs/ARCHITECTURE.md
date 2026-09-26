@@ -193,6 +193,47 @@ or capture time. `ML_MODEL_VERSION = ctu13x5-lgbm-if-1.0.0` opens the gate.
 - Every ML-raised or ML-agreeing alert carries the flow's top 5 LightGBM `pred_contrib`
   features with their values.
 
+## 8a. Campaign correlation and host stage
+
+`src/sih26145/correlate.py` runs in the consumer for every flow. It reads the flow's pivots at
+the flow's own scoring time, so the result does not depend on batching. For each alert it
+sets `campaign_id` and `host_stage`, plus a `detection.correlation` record: host, tactic, the
+pivots it joined on, refused pivots, and refused merges. These fields are inside the hash chain.
+
+- **Pivots:**
+  - `host:` the internal endpoint;
+  - `dst:` the other endpoint;
+  - `ja4:` the JA4 fingerprint;
+  - `name:` the DNS query name or SNI;
+  - `port:` the destination port class.
+- **Rarity:** `idf = ln((N + 1000) / (df + 1))` over the last N ≤ 1,000 alerts, and a pivot is
+  rare when idf ≥ ln 10. The prior of 1,000 pseudo-alerts means a pivot is common only when it
+  appears in roughly 10% or more of recent alerts.
+- **Join:**
+  - An alert joins the campaign it shares the most rare pivots with, when it shares ≥ 2 rare
+    pivots, or 1 rare pivot within 900 s of event time of the campaign's last alert.
+  - The port class supports a join but never makes one alone.
+  - Ties go to the older campaign, and campaigns never merge with each other.
+- **Common infrastructure never merges:**
+  - A shared resolver (a port-53 destination with ≥ 5 long-term sources) is refused.
+  - So are the top 10 destinations by long-term fan-in (fan-in ≥ 5).
+  - The refused merge is recorded, for example "not merged: shared resolver 10.0.0.53".
+- **`campaign_id`** is `camp-` + the first 12 hex characters of sha256 of the first alert's
+  (flow_id, event time, class). It is deterministic across runs.
+- **`host_stage`** is the ATT&CK tactic of the alert's class:
+  - recon → TA0007 Discovery;
+  - C2, DGA, tunnel and encrypted anomaly → TA0011 Command and Control;
+  - exfil → TA0010 Exfiltration;
+  - DDoS → TA0040 Impact, with the host as target;
+  - ML-only → unclassified.
+
+  `GET /api/v1/hosts/{ip}/timeline` lists a host's observed stages in order of first sighting.
+  It is history only: no next-stage prediction (§14).
+- **Bounded memory:** 1,000 alerts in the IDF window, 512 live campaigns (LRU), and 4,096
+  fan-in entries.
+- **API:** `GET /api/v1/campaigns` and `GET /api/v1/campaigns/{id}` read SQLite, so they
+  survive a restart.
+
 ## 9. Streaming and backpressure
 
 Ingest and scoring are decoupled by an `asyncio.Queue(maxsize=N)`. When the queue is

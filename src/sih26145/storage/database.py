@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional
 from sih26145.alerts.models import Alert, upgrade_v1_dict
 from sih26145.storage.chain import GENESIS, ROW_SQL, record_hash, verify_rows
 
+_RANK = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
 SCHEMA_VERSION = 3  # PRAGMA user_version once all migrations have run
 DB_PATH_ENV = "SIH26145_DB_PATH"
 
@@ -159,6 +160,65 @@ class AlertStorage:
             ),
         )
         await conn.commit()
+
+    async def _rows(self, sql: str, params=()) -> List[Dict[str, Any]]:
+        await self.init_db()
+        conn = await self.get_connection()
+        out = []
+        async with conn.execute(sql, params) as cur:
+            async for (raw,) in cur:
+                try:
+                    out.append(json.loads(raw))
+                except (ValueError, TypeError):
+                    continue
+        return out
+
+    async def get_campaigns(self, limit: int = 5000) -> List[Dict[str, Any]]:
+        """Campaign summaries from the most recent `limit` correlated alerts, newest first."""
+        rows = await self._rows("SELECT json_data FROM alerts WHERE campaign_id IS NOT NULL ORDER BY seq DESC LIMIT ?",
+                                (max(1, min(50_000, int(limit))),))
+        camps: Dict[str, Dict[str, Any]] = {}
+        for a in reversed(rows):
+            corr = (a.get("detection") or {}).get("correlation") or {}
+            c = camps.setdefault(a["campaign_id"], {
+                "campaign_id": a["campaign_id"], "alerts": 0, "hosts": [], "threat_classes": [], "tactics": [],
+                "first_seen": a["timestamp"], "last_seen": a["timestamp"], "max_severity": a["severity"],
+                "not_merged": []})
+            c["alerts"] += 1
+            c["first_seen"], c["last_seen"] = min(c["first_seen"], a["timestamp"]), max(c["last_seen"], a["timestamp"])
+            for key, val in (("hosts", corr.get("host")), ("threat_classes", a["threat_class"]),
+                             ("tactics", corr.get("tactic"))):
+                if val and val not in c[key]:
+                    c[key].append(val)
+            if _RANK.get(a["severity"], 0) > _RANK.get(c["max_severity"], 0):
+                c["max_severity"] = a["severity"]
+            for note in corr.get("not_merged") or []:
+                if note not in c["not_merged"]:
+                    c["not_merged"].append(note)
+        return sorted(camps.values(), key=lambda c: c["last_seen"], reverse=True)
+
+    async def get_campaign_alerts(self, campaign_id: str) -> List[Dict[str, Any]]:
+        return await self._rows("SELECT json_data FROM alerts WHERE campaign_id = ? ORDER BY seq LIMIT 5000",
+                                (str(campaign_id),))
+
+    async def host_timeline(self, ip: str) -> List[Dict[str, Any]]:
+        """Observed stages of one internal host, in order of first sighting: one entry per
+        (tactic, threat class) with first/last seen and the alert count. No prediction."""
+        rows = await self._rows(
+            "SELECT json_data FROM alerts WHERE json_extract(json_data, '$.detection.correlation.host') = ? "
+            "ORDER BY seq LIMIT 10000", (str(ip),))
+        stages: Dict[tuple, Dict[str, Any]] = {}
+        for a in rows:
+            corr = a["detection"]["correlation"]
+            key = (a.get("host_stage"), a["threat_class"])
+            st = stages.setdefault(key, {"tactic_id": a.get("host_stage"), "tactic": corr.get("tactic"),
+                                         "threat_class": a["threat_class"], "first_seen": a["timestamp"],
+                                         "last_seen": a["timestamp"], "alerts": 0, "campaign_ids": []})
+            st["alerts"] += 1
+            st["first_seen"], st["last_seen"] = min(st["first_seen"], a["timestamp"]), max(st["last_seen"], a["timestamp"])
+            if a.get("campaign_id") and a["campaign_id"] not in st["campaign_ids"]:
+                st["campaign_ids"].append(a["campaign_id"])
+        return sorted(stages.values(), key=lambda s: s["first_seen"])
 
     async def verify_chain(self) -> dict:
         """Recompute the whole chain (storage/chain.verify_rows) on this connection."""

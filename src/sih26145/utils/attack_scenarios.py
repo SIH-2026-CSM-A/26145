@@ -165,5 +165,30 @@ def demo_packets() -> Packets:
     return sum((ATTACK_SCENARIOS[name](T0 + dt) for name, dt in offsets.items()), [])
 
 
+def readdress(packets: Packets, mapping: Dict[str, str]) -> Packets:
+    """The same packets with IPv4 addresses swapped per `mapping` (checksums recomputed)."""
+    import socket
+    raw = {socket.inet_aton(a): socket.inet_aton(b) for a, b in mapping.items()}
+    out = []
+    for t, frame in packets:
+        eth = dpkt.ethernet.Ethernet(frame)
+        ip = eth.data
+        if isinstance(ip, dpkt.ip.IP) and (ip.src in raw or ip.dst in raw):
+            ip.src, ip.dst = raw.get(ip.src, ip.src), raw.get(ip.dst, ip.dst)
+            ip.sum = 0
+            if isinstance(ip.data, (dpkt.tcp.TCP, dpkt.udp.UDP)):
+                ip.data.sum = 0
+            frame = bytes(eth)
+        out.append((t, frame))
+    return out
+
+
+def one_host_chain(t0: float = T0, host: str = "192.168.1.66") -> Packets:
+    """Recon, then C2, then exfiltration, all from one internal host: the scripted campaign."""
+    return (readdress(port_sweep(t0), {"192.168.1.52": host})
+            + readdress(c2_beacon(t0 + 60), {"192.168.1.70": host})
+            + readdress(exfil_upload(t0 + 700), {"192.168.1.51": host}))
+
+
 def write_attack(name: str, path: str, **kwargs) -> int:
     return _write(path, ATTACK_SCENARIOS[name](**kwargs))

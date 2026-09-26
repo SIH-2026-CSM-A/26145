@@ -15,7 +15,7 @@
 # tests/contract/ checks their source code against these declarations.
 # Changing a row or a consumer's reads = bump contract_version.
 
-contract_version = "1.2.0"
+contract_version = "1.3.0"
 
 features = [
   # ---- Tier 1: per-flow FeatureVector ------------------------------------------------------
@@ -179,6 +179,12 @@ weakness = "Trained on header-only CTU-13-Extended captures: no DNS/TLS content 
 # The feature dump (training data) and the runtime model input: models/features.py model_row.
 # Reads every FeatureVector field plus the store and flow-context features the detectors read;
 # reverse_dependent reads are NaN when the reverse half was not observed.
+[consumers.campaign_correlator]
+ps_class = "all"
+max_state = "computable"
+reads = ["dst_distinct_srcs_longterm"]
+weakness = "Common-infrastructure refusal uses long-term fan-in only; a rarely used shared server can still join two unrelated alerts when they share another rare pivot or fall within 900 s."
+
 [consumers.feature_dump]
 ps_class = "all"
 max_state = "reverse_dependent"
