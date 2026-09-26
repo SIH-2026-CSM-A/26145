@@ -33,7 +33,16 @@ def main():
     serve_parser.add_argument("--db", type=str, default=None, help="SQLite database path (default: in memory)")
     serve_parser.add_argument("--tick", type=float, default=1.0, help="Idle-flush timer period, seconds")
 
+    dump_parser = subparsers.add_parser("dump-features", help="Write one model-input row per scored flow (gzip CSV)")
+    dump_parser.add_argument("pcap_file", type=str, help="Capture to replay (unthrottled, lossless)")
+    dump_parser.add_argument("--out", required=True, help="Output .csv.gz path")
+
     args = parser.parse_args()
+    if args.command == "dump-features":
+        import json
+        from sih26145.features.dump import dump_features
+        print(json.dumps(asyncio.run(dump_features(args.pcap_file, args.out))))
+        return
     if args.command == "serve":
         import logging
         from sih26145.serve import serve

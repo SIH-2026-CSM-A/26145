@@ -12,6 +12,7 @@ from sih26145.features.extractor import FeatureExtractor
 from sih26145.features.store import FeatureStore
 from sih26145.flow.models import FlowRecord
 from sih26145.flow.tracker import FlowTracker
+from sih26145.models.features import model_row
 from sih26145.models.suite import MLModelSuite
 from sih26145.storage.database import AlertStorage
 from sih26145.streaming import run_stream
@@ -22,14 +23,18 @@ class ThreatDetectionPipeline:
 
     `storage` and `publish` let the `serve` command share the API's AlertStorage and SSE
     broadcaster; `publish` receives each alert as a dict as soon as it is stored.
+    `feature_sink(flow, row)` receives each flow's model input row (the feature dump);
+    `ml=False` skips model scoring.
     """
 
     def __init__(self, db_path: Optional[str] = None, storage: Optional[AlertStorage] = None,
-                 publish: Optional[Callable[[dict], None]] = None):
+                 publish: Optional[Callable[[dict], None]] = None,
+                 feature_sink: Optional[Callable[[FlowRecord, dict], None]] = None, ml: bool = True):
         self.flow_tracker = FlowTracker(max_flows=10000, idle_timeout=15.0, active_timeout=60.0)
         self.feature_extractor = FeatureExtractor()
         self.rule_suite = RuleDetectorSuite()
-        self.ml_suite = MLModelSuite()
+        self.ml_suite = MLModelSuite() if ml else None
+        self.feature_sink = feature_sink
         self.aggregator = EvidenceAggregator()
         self.storage = storage or AlertStorage(db_path)
         self.publish = publish
@@ -59,8 +64,11 @@ class ThreatDetectionPipeline:
         self.feature_store.update(flow)
         fv = self.feature_extractor.extract(flow)
         ctx = DetectionContext(flow, self.feature_store, self.policy)
+        row = model_row(fv, ctx)  # at scoring time: after this flow's store update, before the next
+        if self.feature_sink is not None:
+            self.feature_sink(flow, row)
         rule_hits = self.rule_suite.evaluate(fv, ctx)
-        ml_preds = self.ml_suite.predict(fv)
+        ml_preds = self.ml_suite.predict(fv) if self.ml_suite is not None else []
         alerts = self.aggregator.aggregate(flow=flow, fv=fv, rule_hits=rule_hits, ml_predictions=ml_preds)
         for alert in alerts:
             await self.storage.save_alert(alert)

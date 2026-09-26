@@ -8,6 +8,7 @@ import pytest
 
 import sih26145.detectors.rules.detectors as rule_detectors
 import sih26145.models.anomaly as anomaly
+import sih26145.models.features as model_features
 from sih26145.contract import UnavailableFeatureError, load_contract, parse_contract
 from sih26145.features.models import FeatureVector
 
@@ -63,6 +64,16 @@ def test_ml_feature_array_reads_match_declaration():
     reads = scan_reads(fn)
     assert contract.read_violations("ml_flow_models", reads) == []
     assert reads == set(contract.consumer("ml_flow_models").reads)
+
+
+def test_feature_dump_reads_match_declaration():
+    """model_row reads the whole FeatureVector (asdict), the port class, and store/flow
+    features through literal calls, which the scan sees."""
+    contract = load_contract()
+    fields = {f.name for f in dataclasses.fields(FeatureVector)} - {"flow_key_str"}
+    reads = scan_reads(ast.parse(inspect.getsource(model_features))) | fields | {"dst_port_class"}
+    assert contract.read_violations("feature_dump", reads) == []
+    assert reads == set(contract.consumer("feature_dump").reads)
 
 
 def test_every_feature_vector_field_is_declared():

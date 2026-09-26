@@ -155,8 +155,12 @@ throughput · **AS** structured alert schema · **(a)–(f)** the six threat cla
 - `ingest/parser.py:22` sets `packet_len = captured_len`. dpkt's pcap iterator
   (`ingest/reader.py:35`) yields only the captured buffer, so on a truncated capture every
   byte-derived feature (bps, total_bytes, sizes) undercounts.
-- Threatens: (a), (f), **TP** in Mbps. Fix: TODO Next (read original length from the record
-  header). Recorded against the byte features in the contract.
+- Threatens: (a), (f), **TP** in Mbps. **Fixed (session 3):** `ingest/reader.py` reads each
+  record's original (wire) length and passes it to the parser: classic pcap from the record
+  header, pcapng from each Enhanced/Packet Block (dpkt parses that field and drops it).
+  Header-only captures such as CTU-13-Extended, which are pcapng with TCP cut at 54 bytes and
+  UDP at 42, therefore count full sizes. `tests/ingest/test_truncated_capture.py` pins both
+  formats.
 
 ### A9 — Reverse-direction packets become separate flows; visibility is never measured
 - `FlowTracker` keys on the directional 5-tuple (`flow/tracker.py:41`); B→A packets of an
@@ -203,7 +207,7 @@ throughput · **AS** structured alert schema · **(a)–(f)** the six threat cla
 | A4 | DGA misfires | Fixed: host-tier DGA/tunnel rules with NXDOMAIN when answered; Ramnit DGA scenario (session 2). qtype still dropped (TODO) |
 | A5 | Fake metrics | Fixed: `/metrics` reports the running pipeline; null when none is attached (session 2) |
 | A6–A7 | Not wired; unbounded latency | Fixed: `serve` (pipeline + API + SSE, one process), bounded queue with drop counter, idle-flush timer (session 2) |
-| A8 | Truncated byte counts | Open (TODO Next). The benchmark capture has 0 truncated records, so its Mbps is unaffected |
+| A8 | Truncated byte counts | Fixed: wire length from classic-pcap record headers and pcapng packet blocks (session 3) |
 | A9 | Direction never measured | Fixed |
 | A10 | Wall-clock timestamps | Fixed |
 | A11 | Drift | Fixed: docs, DB default path, and AGENTS.md rule 7 (owner decision, session 2) |

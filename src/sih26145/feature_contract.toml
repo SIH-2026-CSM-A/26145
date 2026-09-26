@@ -15,13 +15,13 @@
 # tests/contract/ checks their source code against these declarations.
 # Changing a row or a consumer's reads = bump contract_version.
 
-contract_version = "1.1.0"
+contract_version = "1.2.0"
 
 features = [
   # ---- Tier 1: per-flow FeatureVector ------------------------------------------------------
   { name = "duration",                state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Span of observed packets; covers both halves when both are captured." },
   { name = "total_packets",           state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Count of observed packets (both halves if captured)." },
-  { name = "total_bytes",             state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Sum of observed frame lengths. Undercounts under snaplen truncation (AUDIT A8)." },
+  { name = "total_bytes",             state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Sum of observed frame lengths, taken from each record's original (wire) length (classic pcap and pcapng), so snaplen-truncated captures count full sizes (AUDIT A8, fixed)." },
   { name = "pps",                     state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "total_packets / duration; meaningless for sub-millisecond flows (AUDIT A1)." },
   { name = "bps",                     state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "total_bytes / duration; same caveats as pps and total_bytes." },
   { name = "pkt_size_min",            state = "computable", tier = "flow", approx = "exact", sources = ["dpkt"], reason = "Observed frame sizes. Zeek conn.log has no size distribution." },
@@ -42,6 +42,7 @@ features = [
   { name = "is_udp",                  state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "IP protocol header." },
   { name = "is_icmp",                 state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "IP protocol header." },
   { name = "dst_port",                state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Destination port of the flow key (first observed packet)." },
+  { name = "dst_port_class",          state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Coarse service class of dst_port for models (0 no port, 1 < 1024, 2 1024-49151, 3 >= 49152): exact ports are a leakage risk." },
   { name = "dns_query_count",         state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Question section is present in both queries and responses, so either half yields it." },
   { name = "dns_max_domain_entropy",  state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Shannon entropy of the queried name; either half." },
   { name = "dns_max_subdomain_depth", state = "computable", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Label count of the queried name; either half." },
@@ -170,4 +171,28 @@ reads = [
   "dns_query_count", "dns_max_domain_entropy", "dns_max_subdomain_depth",
   "tls_client_hello_count", "tls_max_sni_entropy", "tls_max_sni_length",
   "has_syn", "has_fin", "has_rst",
+]
+
+# The feature dump (training data) and the runtime model input: models/features.py model_row.
+# Reads every FeatureVector field plus the store and flow-context features the detectors read;
+# reverse_dependent reads are NaN when the reverse half was not observed.
+[consumers.feature_dump]
+ps_class = "all"
+max_state = "reverse_dependent"
+reads = [
+  "duration", "total_packets", "total_bytes", "pps", "bps",
+  "pkt_size_min", "pkt_size_max", "pkt_size_mean", "pkt_size_std",
+  "pkt_size_q25", "pkt_size_q50", "pkt_size_q75",
+  "iat_mean", "iat_var", "iat_min", "iat_max", "jitter", "burstiness_ratio", "small_pkt_ratio",
+  "is_tcp", "is_udp", "is_icmp", "dst_port", "dns_query_count", "dns_max_domain_entropy",
+  "dns_max_subdomain_depth", "tls_client_hello_count", "tls_max_sni_entropy", "tls_max_sni_length",
+  "has_syn", "has_fin", "has_rst", "dst_port_class",
+  "reverse_seen", "egress_bytes", "outbound_inbound_byte_ratio", "off_hours",
+  "src_flows_w", "src_distinct_dsts_w", "src_distinct_dst_ports_w", "src_syn_only_ratio_w",
+  "src_periodic_dsts_w", "src_egress_bytes_z", "src_dns_queries_w", "src_distinct_qnames_w",
+  "src_high_entropy_qnames_w", "src_qname_len_sum_w", "src_nxdomain_rate_w",
+  "dst_flows_w", "dst_bytes_w", "dst_distinct_srcs_w", "dst_src_ip_entropy_w", "dst_syn_only_ratio_w",
+  "dst_reflector_flows_w", "dst_reflector_bytes_w", "dst_reflector_mean_pkt_w",
+  "dst_bytes_vs_baseline", "dst_flows_vs_baseline", "dst_distinct_srcs_longterm",
+  "pair_flows_w", "pair_iat_mean", "pair_iat_cv", "pair_iat_n", "pair_history_count", "ja4_prevalence",
 ]

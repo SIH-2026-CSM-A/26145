@@ -11,15 +11,16 @@ from sih26145.ingest.tls_fingerprint import ja3, ja3s, ja4, parse_hello
 class PacketParser:
     """Safely extracts observable header metadata from raw frame bytes."""
 
-    def parse_packet(self, timestamp: float, buf: bytes) -> PacketMetadata:
+    def parse_packet(self, timestamp: float, buf: bytes, wire_len: Optional[int] = None) -> PacketMetadata:
         """Parse raw link-layer frame buffer into normalized PacketMetadata.
         
         Guarantees that malformed, truncated, or unsupported frames are handled
         gracefully without raising unhandled exceptions. Payload bytes are
-        never exposed.
+        never exposed. `wire_len` is the original length from the capture record header;
+        a snaplen-truncated record keeps its true size for byte counts (AUDIT A8).
         """
         captured_len = len(buf)
-        packet_len = captured_len
+        packet_len = max(wire_len or 0, captured_len)
 
         # Defaults
         ip_ver: Optional[int] = None
