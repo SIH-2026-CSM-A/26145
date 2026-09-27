@@ -20,13 +20,13 @@ Then open **http://127.0.0.1:8000**. Needs Python 3.11+ with [uv](https://docs.a
 and Node 20+ (only to build the dashboard the first time). With Docker instead:
 `docker compose up --build`, same address, replaying at 2×. See `DEPLOY.md`.
 
-![The dashboard after one replay of the demo capture: four campaigns, the live facts strip and the latest alerts](docs/media/01-dashboard.png)
+![The live view: the one-way link (dots only ever move toward the enclave; bytes sent back: 0), the six PS threat classes with their latest alert, the live figures and four campaigns](docs/media/s6-01-hero-tiles-kpi.png)
 
-![Clicking host 192.168.1.66 shows the stages observed on it: Discovery, then Command and Control, then Exfiltration](docs/media/02-host-timeline.png)
+![The campaign map: 192.168.1.66's scan, C2, rare TLS, DGA, DNS tunnel and exfiltration in one campaign; the SYN flood on 10.50.0.10 is its own](docs/media/s6-02-campaign-map.png)
 
-More stills (the evidence drawer, the model card, the facts strip, and `verify-log` catching a
-one-byte edit) are in [`docs/media/`](docs/media/). `dashboard/tests/demo-shots.mjs --ppt` and
-`scripts/render_verify_log.py` make them from a live run.
+More stills (the stage timeline, the exfiltration case file, the model card, the KPI strip, and
+`verify-log` catching a one-byte edit) are in [`docs/media/`](docs/media/) as `s6-*.png`.
+`dashboard/tests/demo-shots.mjs` and `scripts/render_verify_log.py` make them from a live run.
 
 What happens:
 - The real pipeline replays `demo/demo.pcap`, a committed 11-minute capture, at 5× real time,

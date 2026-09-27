@@ -56,37 +56,56 @@ def run_steps(work: Path) -> list[tuple[str, str]]:
     return out
 
 
-W, H, PAD = 1920, 1080, 48
-BG, FG, DIM, GREEN, RED, PROMPT = "#0b1220", "#e2e8f0", "#64748b", "#4ade80", "#f87171", "#38bdf8"
+W, H, PAD = 1920, 1080, 64
+# the dashboard's tokens (dashboard/src/index.css) and its bundled fonts (@fontsource-variable)
+INK, PANEL, LINE = "#040814", "#0e1832", "#26395f"
+FG, DIM, GREEN, RED, PROMPT = "#e6edf7", "#9aa8c0", "#34d399", "#f43f5e", "#5ee6ff"
+FONTS = REPO / "dashboard" / "node_modules" / "@fontsource-variable"
+MONO = FONTS / "jetbrains-mono" / "files" / "jetbrains-mono-latin-wght-normal.woff2"
+NOLIG = ["-calt", "-liga"]  # JetBrains Mono would draw "--" and "->" as ligatures
+SANS = FONTS / "space-grotesk" / "files" / "space-grotesk-latin-wght-normal.woff2"
+
+
+def face(path: Path, size: int, weight: int) -> ImageFont.FreeTypeFont:
+    f = ImageFont.truetype(str(path), size)
+    f.set_variation_by_axes([weight])
+    return f
 
 
 def render(transcript: list[tuple[str, str]], path: str, size: int = 26) -> None:
-    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", size)
-    bold = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", size)
-    img = Image.new("RGB", (W, H), BG)
+    font, bold = face(MONO, size, 400), face(MONO, size, 700)
+    img = Image.new("RGB", (W, H), INK)
     d = ImageDraw.Draw(img)
-    d.rectangle([0, 0, W, 56], fill="#1e293b")
-    for k, c in enumerate(("#f87171", "#fbbf24", "#4ade80")):
-        d.ellipse([24 + k * 34, 18, 44 + k * 34, 38], fill=c)
-    d.text((W // 2, 28), "sih26145: tamper-evident alert log (SHA-256 hash chain)", font=font, fill=DIM, anchor="mm")
-    y, line_h, cols = 56 + PAD, int(size * 1.45), int((W - 2 * PAD) // font.getlength("m"))
+    for gx in range(0, W, 48):  # the page's faint grid
+        d.line([(gx, 0), (gx, H)], fill="#0a1226")
+    for gy in range(0, H, 48):
+        d.line([(0, gy), (W, gy)], fill="#0a1226")
+    box = [32, 32, W - 32, H - 32]
+    d.rounded_rectangle(box, radius=22, fill=PANEL, outline=LINE, width=1)
+    d.line([(32, 104), (W - 32, 104)], fill=LINE)
+    d.text((64, 68), "SAAKSHI", font=face(SANS, 30, 700), fill=FG, anchor="lm")
+    d.text((230, 68), "tamper-evident alert log · SHA-256 hash chain · every command below ran for real",
+           font=face(SANS, 24, 400), fill=DIM, anchor="lm")
+    y, line_h = 104 + PAD // 2 + 8, int(size * 1.5)
+    cols = int((W - 2 * PAD - 64) // font.getlength("m"))
 
-    def line(text, fill, f=font, x=PAD):
+    def line(text, fill, f=font, x=PAD + 32):
         nonlocal y
         for k in range(0, max(len(text), 1), cols):
-            d.text((x, y), text[k:k + cols], font=f, fill=fill)
+            d.text((x, y), text[k:k + cols], font=f, fill=fill, features=NOLIG)
             y += line_h
 
     for cmd, output in transcript:
         first, *rest = cmd.split("\n")
-        d.text((PAD, y), "$ ", font=bold, fill=PROMPT)
-        line(first, FG, bold, PAD + int(font.getlength("$ ")))
+        d.text((PAD + 32, y), "$ ", font=bold, fill=PROMPT, features=NOLIG)
+        line(first, FG, bold, PAD + 32 + int(font.getlength("$ ")))
         for r in rest:
-            line("> " + r, FG)
+            line("> " + r, DIM)
         for o in output.split("\n"):
-            line(o, GREEN if o.startswith("verified") else RED if o.startswith("BROKEN") else DIM)
+            line(o, GREEN if o.startswith("verified") else RED if o.startswith("BROKEN") else DIM,
+                 bold if o.startswith(("verified", "BROKEN")) else font)
         y += line_h // 2
-    if y > H - PAD // 2:
+    if y > H - 48:
         return render(transcript, path, size - 1)  # shrink until the whole transcript fits
     img.save(path, optimize=True)
 
