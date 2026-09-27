@@ -3,9 +3,9 @@
 IDs in brackets refer to docs/AUDIT.md.
 
 ## Now
-- [ ] Deploy the demo to the GCP VM (`DEPLOY.md`: plain :8000, or the `https` compose profile
-      with `<VM-IP>.sslip.io`). The video and the PPT stills are done
-      (`dashboard/tests/demo-video.mjs`, `demo-shots.mjs --ppt`, `scripts/render_verify_log.py`).
+- [ ] Redeploy the VM (`saakshi-demo`, boots from the `saakshi-ref` metadata ref) at tag
+      `idea-deck-v3-ui` for the session-6 dashboard. Owner does this.
+- [ ] Narrated film (session 6 Part D): script, voice pick, recording, assembly.
 - [ ] C2 is still the noisiest rule on real traffic: about 97 alerts per 10k flows on held-out
       s12, 97% on unlabelled hosts (docs/RULES.md §4). The 90%-of-TP floor binds because CTU TPs
       are host-based. The next lever is not a threshold but a feature (e.g. a long-horizon

@@ -1,5 +1,78 @@
 # Session Log
 
+## 2026-09-27 — Claude Code (Opus 5.5) — session 6: a dashboard judges remember (+ film, in progress)
+
+**Agent:** Claude Code (Anthropic, model Opus 5.5). Branch `main`, starting at `977301e` (236 tests).
+No other agent worked on this repo. The pipeline is frozen at `idea-deck-v3`: no detection, flow,
+feature, model or storage code changed.
+
+### Owner decisions
+- **Mockups first.** Two mockups were rendered from the real components on a live replay and approved.
+- **Changes after review:**
+  - KPI notes name the demo rate next to the tested capacity;
+  - tiles show the latest real alert's evidence line;
+  - the ribbon is full width;
+  - the map seams are fixed;
+  - the 2D fallback matches the 3D hero;
+  - the case file scrolls and fits the still.
+- **Plain SVG for the campaign map** (Cytoscape removed); React 19 (current fiber/drei need it).
+- **Order:** A → B → C → E (stills + tag), then the narrated film.
+
+### Shipped (commits in order)
+1. `b25962d feat(dashboard): design system`:
+   - tokens and bundled fonts;
+   - a 14 px text floor;
+   - Counter (anime.js) and Sparkline;
+   - PS tile definitions.
+2. `6d83f3a feat(dashboard): ...`:
+   - the one-way-link hero (three.js), with a 2D fallback on `?nogl` or without WebGL;
+   - six PS tiles, the KPI strip, the ribbon and the replay banner;
+   - the SVG campaign map, the stage timeline, the case file (chain links + Verify) and the model card;
+   - API: `GET /stats/classes` and `GET /chain/blocks`; HEAD on every GET route (the SSE stream excepted);
+   - tests: `tests/api/test_dashboard_endpoints.py`; `smoke.mjs` rewritten; `smoke.sh` paces at 60×.
+3. `6b29639 feat(demo): stills`:
+   - `docs/media/s6-01..07`;
+   - `demo-shots.mjs` rewritten;
+   - `render_verify_log.py` in the new palette;
+   - `demo-video.mjs` removed (it drove Cytoscape).
+4. `docs:` this entry, TODO.
+
+### Verification
+- `uv run pytest -q`: 240 passed. Ruff (`--isolated --select E4,E7,E9,F`): 30 findings, none new.
+- `scripts/smoke.sh` passes:
+  - hero webgl;
+  - tile (a) pulsed;
+  - no map label overlap;
+  - the case file opened and Verify recomputed the chain;
+  - `?nogl` rendered;
+  - no offsite request.
+- Bundle: `index` 453 KB (148 KB gzip), lazy `Scene3D` 952 KB (257 KB gzip), CSS 26 KB, fonts
+  bundled.
+- **fps** (15 s rAF sample during a live 5× replay, as in the Performance panel's frame track):
+  - native Windows Chrome, this laptop: **144 fps** (the display's refresh), p95 frame 7.1 ms,
+    for both the WebGL hero and `?nogl`, at 1920×1050 device px;
+  - under WSLg (D3D12 → Intel UHD): 43 fps for WebGL; the same page with the hero hidden runs at
+    48 fps, and a blank page at 60. The cost is WSLg compositing, not the scene;
+  - headless SwiftShader: 55 fps.
+- **Benchmark re-run** (CTU-13 s12 unthrottled): **867.5 flows/s, 224.9 Mbps**, 0 drops. That is
+  +0.9% vs the 859.5 mean, inside the 5% bar. Data: `26145-data/bench/s6/s12-u1.json`. Docker
+  Desktop stayed up because another project's six containers were running (not ours to stop).
+  They drew < 1% CPU, and the 1-min load was 0.33 before the run.
+
+### Found along the way
+- **The SYN flood's alert comes out at the capture's EOF flush.** By the time all four campaigns
+  exist the replay is ending, so s6-01 is taken as its spark lands on tile (a). It was still
+  `running` at that moment.
+- **drei `<Html>` dropped a label under React 19.** Hero labels are now DOM, projected by the scene.
+- **Map seams.** `backdrop-filter` on the glass panels left straight seams in headless stills after
+  scrolling, so panel blur was removed (the panels are near-opaque anyway).
+- **Shell kills.** `pkill -f`/`pgrep -f` with a pattern that is also in the shell's own command
+  line kills the shell (exit 144). A bracket trick (`[p]ort 18001`) avoids it.
+
+### Not done / next
+- Part D, the narrated film: script, voice samples, recording, assembly.
+- The VM redeploy (owner).
+
 ## 2026-09-27 — Claude Code (Opus 5.5) — session 5: re-benchmark, PPT stills, demo video, HTTPS profile
 
 **Agent:** Claude Code (Anthropic, model Opus 5.5). Branch `main`, starting at `0b8e954` (236 tests).
