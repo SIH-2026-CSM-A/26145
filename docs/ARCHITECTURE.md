@@ -175,9 +175,11 @@ only contract-declared features.
 | — | `THREAT_UNSUPERVISED_ANOMALY` | IsolationForest score (flow) |
 
 Detectors take `detect(fv, ctx)`; `ctx` carries the flow, the store and the network policy.
-Rules (a)–(e) read tier-2 store features only (ruleset 2.0.0, contract 1.1.0); each hit names
-an entity (destination, host or pair) and the suite raises one alert per (detector, entity)
-per 300 s of event time. Thresholds are hand-set; see the README for known weaknesses.
+Rules (a)–(e) read tier-2 store features only (ruleset 2.1.0, contract 1.3.0). Each hit names
+an entity (destination, host or pair), and the suite raises one alert per (detector, entity)
+per 300 s of event time. The thresholds of (a), (b), (e) and (f) were tuned on CTU-13-Extended
+s1/s5/s6 and reported on held-out s11/s12. The objective and the measured precision are in
+`docs/RULES.md`. DGA, tunnel and TLS thresholds are hand-set.
 
 **ML gate and models** (`docs/MODELS.md`). LightGBM (`THREAT_ML_MALICIOUS_FLOW`) and an
 IsolationForest (`THREAT_UNSUPERVISED_ANOMALY`) are trained on header-only CTU-13-Extended
@@ -424,22 +426,24 @@ smoke test fails if one does):
   visibility is measured per flow (§2).
 - **Deep learning** — unchanged from the baseline: explainability and CPU budget.
 
-## 15. Implementation status (2026-09-26)
+## 15. Implementation status (2026-09-26, session 4)
 
 | Component | Status |
 |---|---|
 | dpkt ingest, flow tracker with bidirectional matching, observability_state | Implemented |
 | Zeek adapter | Not started |
-| Feature contract + tier enforcement test | Implemented (contract 1.1.0) |
+| Feature contract + tier enforcement test | Implemented (contract 1.3.0; the correlator is a declared consumer) |
 | FeatureStore (tier 2) with sketches | Implemented; fed by the orchestrator for every flushed flow |
 | JA3 / JA4 / JA3S | Implemented (dpkt path); JA4 verified against the FoxIO published example |
 | Detector (f) with ratio / substitute branches | Implemented (ruleset 1.1.0) |
-| Detectors (a)–(e) on tier-2 features | Implemented (ruleset 2.0.0); 12 benign regression captures raise zero alerts |
+| Detectors (a)–(e) on tier-2 features | Implemented (ruleset 2.1.0). (a)(b)(e)(f) are tuned on CTU-13-Extended with held-out s11/s12, and precision is measured per detector (`docs/RULES.md`). 12 benign regression captures raise zero alerts |
 | LightGBM / trained IsolationForest | Implemented: trained on 5 CTU-13-Extended scenarios, validated leave-one-scenario-out and time-ordered (`docs/MODELS.md`); gate open, ML-only alerts capped at MEDIUM, IsolationForest corroborates only |
 | Feature dump (training data from the real pipeline) | Implemented: `python -m sih26145.cli dump-features` |
 | Bounded queue + drop counter, idle-flush timer | Implemented (`streaming.py`); drops counted in paced/live replay, lossless in offline analysis |
 | Alert v2 + storage migration + WAL | Implemented |
 | Pipeline → API → SSE wiring | Implemented: `sih26145 serve` runs both in one process; `/metrics` reads the live pipeline; browser-checked |
-| Dashboard v2 fields | Implemented (evidence, capture visibility, substitutions); browser-checked |
-| Campaign graph, visibility gauge | Not started |
-| Throughput benchmark (flows/s, Mbps) | Measured 2026-09-26 with batched ML: ~930 flows/s, ~241 Mbps on CTU-13 s12 (botnet-only); 1,236 flows/s on mixed traffic; one core (`docs/BENCHMARK.md`) |
+| Tamper-evident alert log | Implemented: SHA-256 hash chain, `verify-log`, `export` bundle with a Section 63 data sheet (§11) |
+| Campaign correlation, host stage | Implemented (§8a): IDF pivots, common-infrastructure refusal, observed ATT&CK stages; `/campaigns`, `/hosts/{ip}/timeline` |
+| Dashboard | Implemented (§12): campaign graph, alert drawer, host timeline, live facts strip, model card; same-origin, read-only; Playwright smoke test |
+| Demo package | Implemented: committed `demo/demo.pcap` (real CTU-13 background plus generated attacks), `serve --loop`, Dockerfile, docker-compose, `DEPLOY.md`. Not deployed yet |
+| Throughput benchmark (flows/s, Mbps) | Measured 2026-09-26 with batched ML: ~930 flows/s, ~241 Mbps on CTU-13 s12 (botnet-only); 1,236 flows/s on mixed traffic; one core (`docs/BENCHMARK.md`). **Measured before the correlator was added** (session 4 adds a per-flow pivot read); not re-measured since |

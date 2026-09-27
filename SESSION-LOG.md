@@ -1,5 +1,99 @@
 # Session Log
 
+## 2026-09-26 — Claude Code (Opus 5.5) — session 4: rule precision, hash chain, campaigns, dashboard, demo package
+
+**Agent:** Claude Code (Anthropic, model Opus 5.5). Branch `main`, starting at `21a3946` (204 tests).
+No other agent worked on the repo during this session.
+
+### Owner decisions (at planning)
+- **Part 1 objective.** Precision over known ignores the unknown bucket. So: among candidates
+  that keep ≥ 90% of tuning-set TP, take the lowest alerts per 10k flows; ties go to precision.
+  Report the unknown share and alerts per 10k next to precision. Tune on s1/s5/s6, and report
+  s11/s12 held out.
+- **Public demo, no auth.** Only GET and SSE. A 405 test covers every route, and access is
+  same-origin (CORS removed).
+- **Demo capture committed to git** (< 25 MB, with attribution and a pinned sha256), so a clone
+  plus `docker compose up` runs it.
+- **Dashboard.** Delete old components only if nothing imports them. Check the layout at
+  1366×768 and 1920×1080.
+
+### Shipped (commits in order)
+1. `f4eb2e4 feat(storage):`
+   - A SHA-256 hash chain over stored alerts (genesis = 64 zeros), with schema v3 and plain
+     INSERT.
+   - `sih26145 verify-log` / `export`: `alerts.jsonl`, `chain_head.txt`, `manifest.json`, and a
+     Section 63 BSA data sheet (Part A/Part B, "not legal advice").
+   - `GET /chain/verify`.
+   - Adds the `sih26145` console script.
+2. `3b48655 feat(correlate):` campaign correlation (IDF pivots with a 1,000-alert prior,
+   common-infrastructure refusal recorded on the alert), ATT&CK `host_stage`, `/campaigns`,
+   `/hosts/{ip}/timeline`. Contract 1.3.0 declares the correlator's read.
+3. `fbe65d1 feat(dashboard):` Cytoscape campaign graph, alert drawer, host timeline, facts
+   strip, and a model card quoted from MODELS.md. Same-origin and read-only. No-transmit AST test
+   and a Playwright smoke test (`scripts/smoke.sh`).
+4. `db78f4c fix(correlate):` only destination pivots can be refused. A busy workstation had
+   been split into two campaigns in the demo.
+5. `2b7f569 fix(dashboard):` deterministic grid layout. cose had overlapped the campaign boxes.
+6. `8d0b84b feat(eval):` `scripts/rule_eval.py` (run/join/sweep/pick/report),
+   `docs/RULES.md`, `docs/rule_metrics.json`, ruleset 2.1.0.
+7. `d80b5d6 feat(demo):` `demo/demo.pcap`, `serve --loop`, Dockerfile, compose, `DEPLOY.md`,
+   `scripts/demo.sh`.
+8. `docs:` this entry, TODO, ARCHITECTURE, README, CLAUDE.md.
+
+### Results
+- **Rule precision** (full pipeline, before → after; docs/RULES.md §4 has every row):
+  - **held-out s12:** C2 137.5 → 97.3 alerts per 10k flows, precision over known 0.433 → 0.437,
+    97% unknown. Exfil ratio 8.73 → 0.79 per 10k (all unknown).
+  - **held-out s11:** C2 64.4 → 23.6 per 10k, 0 TP before and after. The Rbot flood is still
+    caught by the baseline rule.
+  - **tuning:** C2 loses all 5 s5 TP; the pooled floor holds through s1.
+  - **DDoS:** the tuning is vacuous (no flood in s1/s5/s6), bounded by the generated captures.
+- **Sweep fidelity.** The offline sweep equals the pipeline exactly, per rule, for alerts, TP
+  and FP, before and after, in all five scenarios.
+- **s11 cold start.** Cold windows of real traffic reach 1,532 MB, above the flood's 635 MB. No
+  rule was added; the reason is documented.
+- **Demo** (unthrottled): 10 alerts in 4 campaigns, all six PS classes.
+  - Host 192.168.1.66: recon, TLS, C2, DGA, tunnel, exfil = one campaign (Discovery → C2 →
+    Exfiltration).
+  - DDoS on 10.50.0.10: its own campaign.
+  - 3 C2 alerts on real CTU normal hosts (147.32.84.134, 147.32.84.170 ×2).
+  - At 5× and 2× the alert list is identical to unthrottled: 20,857 flows, 0 dropped.
+- **Docker.** The image runs with `--network none` (uid 10001, read-only rootfs). Compose on a
+  free port gives 405 for POST/DELETE and no CORS headers. The clean-clone image was checked
+  the same way.
+
+### Verification
+- `uv run pytest -q`: **236 passed**, also from a clean clone. The 12 benign captures give 0
+  alerts, and every attack capture fires its detector.
+- `npm run build` passes; `scripts/smoke.sh` passes, also from a clean clone. The dashboard was
+  checked by screenshots at 1366×768 and 1920×1080 on the live demo.
+- Ruff (`--isolated --select E4,E7,E9,F`): 30 findings, none new (31 at session start).
+- **Falsified:**
+  - an injected `sendto` in `ingest/reader.py` turns the no-transmit test red;
+  - a changed model-card figure turns the facts test red;
+  - the busy-host correlation test fails on the pre-fix code.
+
+### Existing tests changed
+- `test_storage.py`: a duplicate `alert_id` is now refused, not replaced (the chain).
+- `test_storage_migration.py`: user_version 3.
+- `test_api_endpoints.py`: the CORS test became `test_no_cross_origin_reads`; SSE queue items
+  are `(event, payload)`.
+- `test_streaming.py`: the same tuple change.
+- `test_rule_detectors.py`: the SYN-flood and C2 boundary tests read the class constants
+  instead of the literal 100 and 8.
+
+### Found along the way
+- `.gitignore`'s Python `lib/` rule hid `dashboard/src/lib/`, and the dashboard commit briefly
+  lacked two files. Fixed (`/lib/`) and amended before push.
+- `*.pcap` was ignored; `!demo/demo.pcap` was added.
+- Port 8000 is occupied on this machine by an unrelated service (it answers with permissive
+  CORS). Use `SIH_PORT` / `PORT`.
+
+### Not done / next
+- Not deployed (next session). Throughput has not been re-measured since the correlator and
+  hash chain were added.
+- C2 is still noisy on real traffic; the next lever is a feature, not a threshold (TODO).
+
 ## 2026-09-26 — Claude Code (Opus 5.5) — session 3: trained models, MODELS.md, batched throughput
 
 **Agent:** Claude Code (Anthropic, model Opus 5.5). Branch `main`, starting at `08cc107`

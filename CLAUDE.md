@@ -26,3 +26,12 @@ Read AGENTS.md (standing rules), docs/ARCHITECTURE.md, docs/AUDIT.md, TODO.md fi
   CTU-13-Extended `*.truncated.pcap` files (pcapng, headers only) in `26145-data/ctu13-extended/`.
 - Throughput figures live in docs/BENCHMARK.md; re-measure (idle machine) before changing them.
 - Commits: conventional commits, no AI-attribution trailers.
+- Rule thresholds are tuned (ruleset 2.1.0, docs/RULES.md). Changing one = rerun
+  `scripts/rule_eval.py` sweep/pick/run/report; `report` asserts its table matches detectors.py.
+- `.gitignore` had a Python `lib/` rule that hid `dashboard/src/lib/`; it is now `/lib/`. Check
+  `git check-ignore -v` when a new directory seems to vanish from a commit.
+- `demo/demo.pcap` is committed (sha256 pinned in tests/integration/test_demo_capture.py,
+  demo/ATTRIBUTION.md, DEPLOY.md). Rebuild = `scripts/build_demo_capture.py`, then update all three.
+- Port 8000 is taken by something else on this machine: use `PORT=18001 scripts/demo.sh`,
+  `SIH_PORT=18000 docker compose up`. Docker Desktop must be started (Windows app) first.
+- The API is read-only by design (public demo, no auth): tests/api/test_readonly_surface.py.

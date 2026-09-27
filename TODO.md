@@ -3,11 +3,14 @@
 IDs in brackets refer to docs/AUDIT.md.
 
 ## Now
-- [ ] Rule thresholds (a)–(f) are hand-set on generated captures. On real mixed traffic they
-      are noisy: on CTU-13-Extended s12 (541,957 flows) the pipeline raised 7,453 C2-beacon and
-      593 exfiltration alerts (docs/BENCHMARK.md). The labelled dumps in
-      `26145-data/features/ctu13-s*.labelled.csv.gz` now allow rule precision/recall per
-      scenario. Measure it, then tune (C2 CV 0.35 / 8 gaps first).
+- [ ] Deploy the demo to the GCP VM (`DEPLOY.md`) and record the Playwright demo video.
+      `dashboard/tests/demo-shots.mjs` takes the 1366×768 / 1920×1080 stills for the PPT.
+- [ ] Re-measure throughput on an idle machine. The session-3 figures predate the correlator
+      and the per-alert hash (docs/BENCHMARK.md scope note).
+- [ ] C2 is still the noisiest rule on real traffic: about 97 alerts per 10k flows on held-out
+      s12, 97% on unlabelled hosts (docs/RULES.md §4). The 90%-of-TP floor binds because CTU TPs
+      are host-based. The next lever is not a threshold but a feature (e.g. a long-horizon
+      periodic-destination set, or payload-size regularity), which needs a contract row.
 - [ ] LightGBM cross-scenario recall at the 1/10k budget is 28%, and a benign failed TCP
       connection sits 0.39 log-odds under the threshold (docs/MODELS.md §4.5). Candidates: more
       benign diversity (more CTU-13-Extended scenarios, other normal captures), or a
@@ -23,15 +26,19 @@ IDs in brackets refer to docs/AUDIT.md.
 - [ ] Zeek adapter behind `FlowSource` (conn/dns/ssl logs + IAT script); dpkt stays fallback.
       Map `resp_pkts > 0` -> reverse_seen and `history` -> observability_state.
 - [ ] Keep DNS qtype on FlowRecord so a TXT/NULL ratio can be declared and computed [A4].
-- [ ] Dashboard: campaign graph (Cytoscape.js). (Link visibility is shown as a number now.)
-- [ ] `record_hash` chain in AlertStorage (tamper-evident log).
+- [ ] DDoS thresholds (ruleset 2.1.0) are bounded only by the generated attack captures: the
+      tuning scenarios have no flood. Validate on a capture with real floods (CTU-13 s10/s11
+      mixed, or a DDoS dataset with pcaps).
+- [ ] Cold-start volumetric detection: no bytes ceiling separates a first-window flood from real
+      bulk transfers (docs/RULES.md §6). A pps- or ICMP-share feature would need a contract row.
 - [ ] Recon shared-infrastructure suppression is per flow; subtract shared destinations from
       the fan-out (separate HLL) if scans hiding among popular servers matter.
 - [ ] C2 poller signature is windowed: pollers slower than the window can see need the
       allowlist, or a long-horizon periodic-destination set.
 
 ## Later
-- [ ] `campaign_id` / `host_stage` correlation across alerts.
+- [ ] Correlator: campaigns never merge after the fact. Two campaigns that later turn out to share
+      a rare pivot stay separate (by design, for determinism); a merge view could be added.
 - [ ] Split flow-tier size/IAT stats per direction on bidirectional flows.
 - [ ] JA4S server fingerprint once the FoxIO licence is reviewed (JA3S used meanwhile).
 - [ ] Reverse-key matching in 4-tuple flow mode.
