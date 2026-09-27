@@ -20,6 +20,14 @@ Then open **http://127.0.0.1:8000**. Needs Python 3.11+ with [uv](https://docs.a
 and Node 20+ (only to build the dashboard the first time). With Docker instead:
 `docker compose up --build`, same address, replaying at 2×. See `DEPLOY.md`.
 
+![The dashboard after one replay of the demo capture: four campaigns, the live facts strip and the latest alerts](docs/media/01-dashboard.png)
+
+![Clicking host 192.168.1.66 shows the stages observed on it: Discovery, then Command and Control, then Exfiltration](docs/media/02-host-timeline.png)
+
+More stills (the evidence drawer, the model card, the facts strip, and `verify-log` catching a
+one-byte edit) are in [`docs/media/`](docs/media/). `dashboard/tests/demo-shots.mjs --ppt` and
+`scripts/render_verify_log.py` make them from a live run.
+
 What happens:
 - The real pipeline replays `demo/demo.pcap`, a committed 11-minute capture, at 5× real time,
   so one loop takes about 2 minutes plus a 30 s hold.
