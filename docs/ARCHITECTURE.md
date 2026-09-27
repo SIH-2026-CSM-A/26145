@@ -446,5 +446,5 @@ smoke test fails if one does):
 | Tamper-evident alert log | Implemented: SHA-256 hash chain, `verify-log`, `export` bundle with a Section 63 data sheet (§11) |
 | Campaign correlation, host stage | Implemented (§8a): IDF pivots, common-infrastructure refusal, observed ATT&CK stages; `/campaigns`, `/hosts/{ip}/timeline` |
 | Dashboard | Implemented (§12): campaign graph, alert drawer, host timeline, live facts strip, model card; same-origin, read-only; Playwright smoke test |
-| Demo package | Implemented: committed `demo/demo.pcap` (real CTU-13 background plus generated attacks), `serve --loop`, Dockerfile, docker-compose, `DEPLOY.md`. Not deployed yet |
+| Demo package | Implemented: committed `demo/demo.pcap` (real CTU-13 background plus generated attacks), `serve --loop`, Dockerfile, docker-compose with an optional `https` Caddy profile, `DEPLOY.md`; scripted demo video and PPT stills (`docs/media/`). Not deployed yet |
 | Throughput benchmark (flows/s, Mbps) | Measured 2026-09-27 on the current code (correlator and hash chain included): ~860 flows/s, ~223 Mbps on CTU-13 s12 (botnet-only); 1,129 flows/s on mixed traffic; one core (`docs/BENCHMARK.md`) |

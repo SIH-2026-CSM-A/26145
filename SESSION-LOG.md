@@ -1,5 +1,78 @@
 # Session Log
 
+## 2026-09-27 — Claude Code (Opus 5.5) — session 5: re-benchmark, PPT stills, demo video, HTTPS profile
+
+**Agent:** Claude Code (Anthropic, model Opus 5.5). Branch `main`, starting at `0b8e954` (236 tests).
+No other agent worked on the repo during this session.
+
+### Owner decisions (at planning)
+- Docker Desktop is quit before the benchmark series and started again only for Part D.
+- The six stills are committed to `docs/media/` (each under 1 MB), and two are shown in the README.
+- Captions say "replayed at 2× real time" and quote only numbers that are on screen or in
+  BENCHMARK/MODELS/RULES. Throughput comes from the new figures.
+
+### Shipped (commits in order)
+1. `fedf71f perf:`
+   - The series was re-run on an idle machine, with Docker Desktop stopped and 1-min load ≤ 1.43.
+     Data is in `26145-data/bench/s5/`.
+   - CTU-13 s12 botnet-only: **859.5 flows/s mean** (803.5 / 879.1 / 895.9) and ~223 Mbps.
+     That is 7.6% below session 3. The repeat was 867.9, within 1.0% of the mean.
+   - Paced 184× gave 0 drops, with flush → alert 6.7 / 217 / 250 ms. 736× with a 1k queue dropped
+     5.6%.
+   - Mixed CTU-13-Extended s12: 1,128.6 flows/s (−8.7%). s11 ran at 676.6 Mbps.
+   - In the profile, the correlator is 2.2% and the chain hash rounds to 0.
+   - The session-3 tables are kept as "superseded"; README and ARCHITECTURE §13/§15 are updated.
+2. `f7b038e feat(demo):`
+   - `demo-shots.mjs --ppt` asserts what each still shows before taking it.
+   - `scripts/render_verify_log.py` is a PEP 723 script (Pillow is not a project dependency). It
+     runs analyze, verify-log, a one-byte edit of alert #3's JSON with Python's sqlite3 (the CLI is
+     not installed) and verify-log again, which prints "BROKEN at index 3 of 10".
+   - `docs/media/` 01–06.
+3. `34a19d4 feat(demo):` `dashboard/tests/demo-video.mjs` records a captioned 1920×1080
+   walkthrough of `serve --speed 2 --loop`:
+   - `--pause 240` only holds the final picture;
+   - every caption is gated on the page or the API;
+   - the recording is 5:58, H.264.
+4. `3b25644 feat(deploy):`
+   - A compose profile `https`: caddy:2 with `SIH_HOSTNAME=<VM-IP>.sslip.io`, and `SIH_BIND` for the
+     sensor port.
+   - `deploy/Caddyfile`; DEPLOY.md firewall rules and steps.
+5. `docs:` this entry, TODO, ARCHITECTURE §15.
+
+### Verification
+- `uv run pytest -q`: 236 passed. `npm run build` passes; `scripts/smoke.sh` passes.
+- Ruff (`--isolated --select E4,E7,E9,F`) gives 30 findings, none new.
+- `docker compose config` passes with and without `--profile https`, and `caddy validate` passes on
+  the Caddyfile.
+- The profile was also run locally on alternate ports with `SIH_HOSTNAME=localhost`:
+  - health 200 over HTTP/2;
+  - HTTP 308 to HTTPS;
+  - POST 405;
+  - the SSE heartbeat passes through unbuffered.
+
+  Not deployed.
+- The video was reviewed frame by frame at several points. Two captions were corrected before the
+  final take:
+  - "scans many ports and machines" became "many ports on 10.0.0.200" (the generator sweeps 100
+    ports on one host);
+  - the DDoS caption no longer says "arrives", because the flood had already appeared by then.
+
+### Found along the way
+- **Title-card wording.** "Replay of a recorded capture … nothing mocked" became "a committed capture
+  (real CTU-13 university traffic plus generated attack packets) … nothing on screen is mocked". The
+  attacks in `demo/demo.pcap` are generated, not recorded.
+- **FP count.** Only 2 of the 3 university-host C2 alerts have the university host as source. The
+  third is inbound (74.125.232.214 → 147.32.84.170), so the video counts either end.
+- **Beat 6.** It was cut: no "not merged" note appears in the demo run, so none is captioned.
+- **Docker.** Docker Desktop restarted by itself at 08:00 UTC, 33 min after the benchmark series
+  ended (07:27 UTC). No measurement overlapped it.
+- **Shell kills.** `pkill -f` with a pattern that also matches the shell's own command line kills
+  the shell (exit 144). Stop background servers by task, or by PID.
+
+### Not done / next
+- The GCP deployment (DEPLOY.md §1–4).
+- Pre-existing and unchanged: C2 noise on real traffic, and the paced-replay tick at high `--speed`.
+
 ## 2026-09-26 — Claude Code (Opus 5.5) — session 4: rule precision, hash chain, campaigns, dashboard, demo package
 
 **Agent:** Claude Code (Anthropic, model Opus 5.5). Branch `main`, starting at `21a3946` (204 tests).

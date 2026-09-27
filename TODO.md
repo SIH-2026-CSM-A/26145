@@ -3,8 +3,9 @@
 IDs in brackets refer to docs/AUDIT.md.
 
 ## Now
-- [ ] Deploy the demo to the GCP VM (`DEPLOY.md`) and record the Playwright demo video.
-      `dashboard/tests/demo-shots.mjs` takes the 1366×768 / 1920×1080 stills for the PPT.
+- [ ] Deploy the demo to the GCP VM (`DEPLOY.md`: plain :8000, or the `https` compose profile
+      with `<VM-IP>.sslip.io`). The video and the PPT stills are done
+      (`dashboard/tests/demo-video.mjs`, `demo-shots.mjs --ppt`, `scripts/render_verify_log.py`).
 - [ ] C2 is still the noisiest rule on real traffic: about 97 alerts per 10k flows on held-out
       s12, 97% on unlabelled hosts (docs/RULES.md §4). The 90%-of-TP floor binds because CTU TPs
       are host-based. The next lever is not a threshold but a feature (e.g. a long-horizon
