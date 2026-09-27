@@ -5,8 +5,6 @@ IDs in brackets refer to docs/AUDIT.md.
 ## Now
 - [ ] Deploy the demo to the GCP VM (`DEPLOY.md`) and record the Playwright demo video.
       `dashboard/tests/demo-shots.mjs` takes the 1366×768 / 1920×1080 stills for the PPT.
-- [ ] Re-measure throughput on an idle machine. The session-3 figures predate the correlator
-      and the per-alert hash (docs/BENCHMARK.md scope note).
 - [ ] C2 is still the noisiest rule on real traffic: about 97 alerts per 10k flows on held-out
       s12, 97% on unlabelled hosts (docs/RULES.md §4). The 90%-of-TP floor binds because CTU TPs
       are host-based. The next lever is not a threshold but a feature (e.g. a long-horizon
@@ -18,7 +16,7 @@ IDs in brackets refer to docs/AUDIT.md.
 - [ ] Paced replay above ~20× compresses the 1 s timer tick into many seconds of capture time,
       so idle flows reach the store out of event order and the alert mix shifts
       (docs/BENCHMARK.md). Scale the tick with `--speed`, or flush on event time when behind.
-- [ ] Profile top item is now dpkt parsing (38.7%), then model-row store reads (13.6%: 30+
+- [ ] Profile top item is now dpkt parsing (36.5%), then model-row store reads (12.9%: 30+
       contract-checked reads per flow). Cache `load_contract().require` per feature name, or
       read store views once per flow.
 

@@ -167,8 +167,9 @@ Throughput benchmark (flows/s, Mbps, drop %, alert latency) on a capture of your
 uv run python scripts/benchmark.py path/to/capture.pcap              # capacity
 uv run python scripts/benchmark.py path/to/capture.pcap --speed 26   # paced replay
 ```
-Measured 2026-09-26 on CTU-13 scenario 12 (Intel i5-13450HX, WSL2, Python 3.13.14, one core,
-trained models batched): about **930 flows/s and 241 Mbps** sustained, and 1,236 flows/s on the
-mixed-traffic CTU-13-Extended capture. Detection latency has two parts. Flow close takes 15 s
-idle or 60 s active (capture time) plus at most one 1 s tick. Flush → alert at half load is p50
-7 ms and p99 305 ms, with 0 drops. Details, all runs and the profile: `docs/BENCHMARK.md`.
+Measured 2026-09-27 on the current code (correlation and hash-chained log included) on CTU-13
+scenario 12 (Intel i5-13450HX, WSL2, Python 3.13.14, one core, trained models batched): about
+**860 flows/s and 223 Mbps** sustained, and 1,129 flows/s on the mixed-traffic CTU-13-Extended
+capture. Detection latency has two parts. Flow close takes 15 s idle or 60 s active (capture time)
+plus at most one 1 s tick. Flush → alert at half load is p50 7 ms and p99 250 ms, with 0 drops.
+Details, all runs and the profile: `docs/BENCHMARK.md`.

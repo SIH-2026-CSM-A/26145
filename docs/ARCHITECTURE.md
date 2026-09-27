@@ -370,24 +370,25 @@ smoke test fails if one does):
 - Throughput is reported as **flows/sec and Mbps** (the PS units), end-to-end, on a stated
   replay, with hardware and Python version named. Packets/sec may be shown only alongside.
 - No figure is written anywhere until it has been measured on the named machine.
-- **Throughput, measured 2026-09-26** (`docs/BENCHMARK.md` has every run and the commands).
+- **Throughput, measured 2026-09-27 on the session-4 code** (`docs/BENCHMARK.md` has every run,
+  the commands and the superseded session-3 figures).
   - Machine: Intel i5-13450HX, WSL2, Python 3.13.14; the pipeline uses one core.
-  - Scope: end to end, including batched LightGBM + IsolationForest on every flow and SQLite WAL
-    writes.
+  - Scope: end to end, including batched LightGBM + IsolationForest on every flow, campaign
+    correlation, and SQLite WAL writes with the per-alert chain hash.
   - CTU-13 scenario 12, botnet hosts only (281.2 MiB, 8,927 flows): **sustained capacity about
-    930 flows/s (927.0–932.8 over three runs) and about 241 Mbps (240.3–241.8)**. A repeat run
-    landed within 0.1%.
+    860 flows/s (803.5–895.9 over three runs, mean 859.5) and about 223 Mbps (208.3–232.3)**,
+    7.6% below session 3's code. A repeat run landed within 1.0% of the mean.
   - Mixed traffic, CTU-13-Extended scenario 12 (all hosts, headers only, 541,957 flows):
-    1,235.5 flows/s. Its 159.0 Mbps is computed from pcapng original packet lengths.
-  - Largest completed: scenario 11 botnet-only (4.07 GB ICMP flood, 281 flows) at 681.3 Mbps and
-    79,913 packets/s.
+    1,128.6 flows/s. Its 145.2 Mbps is computed from pcapng original packet lengths.
+  - Largest completed: scenario 11 botnet-only (4.07 GB ICMP flood, 281 flows) at 676.6 Mbps and
+    79,361 packets/s.
   - **Detection latency** has two parts. Flow close takes 15 s idle or 60 s active (capture
-    time) plus at most one 1 s tick. Flush → alert at ~50% of capacity (paced 200×) is p50
-    6.9 ms, p95 265 ms, p99 305 ms, with 0 drops.
-  - At ~2× capacity with a 1,000-flow queue: 1.8% of flows dropped, every drop counted.
-  - The profile now puts dpkt packet parsing first (38.7%), then the model row's store reads
-    (13.6%), feature extraction (11.7%), the flow tracker (9.3%) and the batched
-    IsolationForest (6.2%). Session 2's 93% single-row predict overhead is gone.
+    time) plus at most one 1 s tick. Flush → alert at ~50% of capacity (paced 184×) is p50
+    6.7 ms, p95 217 ms, p99 250 ms, with 0 drops.
+  - At ~2× capacity with a 1,000-flow queue: 5.6% of flows dropped, every drop counted.
+  - Profile: dpkt packet parsing first (36.5%), then the model row's store reads (12.9%),
+    feature extraction (11.3%), the flow tracker (9.0%) and the batched IsolationForest (8.9%).
+    The correlator is 2.2%; the chain hash rounds to 0.
 - **FeatureStore memory, default configuration** (4,096 hosts, 4,096 destinations, 32,768
   pairs, HLL p=8): stated ceiling from `memory_ceiling_bytes()` = **42.19 MiB**. Measured
   at full occupancy (98,304 flow updates, every table at its cap) under `tracemalloc`:
@@ -446,4 +447,4 @@ smoke test fails if one does):
 | Campaign correlation, host stage | Implemented (§8a): IDF pivots, common-infrastructure refusal, observed ATT&CK stages; `/campaigns`, `/hosts/{ip}/timeline` |
 | Dashboard | Implemented (§12): campaign graph, alert drawer, host timeline, live facts strip, model card; same-origin, read-only; Playwright smoke test |
 | Demo package | Implemented: committed `demo/demo.pcap` (real CTU-13 background plus generated attacks), `serve --loop`, Dockerfile, docker-compose, `DEPLOY.md`. Not deployed yet |
-| Throughput benchmark (flows/s, Mbps) | Measured 2026-09-26 with batched ML: ~930 flows/s, ~241 Mbps on CTU-13 s12 (botnet-only); 1,236 flows/s on mixed traffic; one core (`docs/BENCHMARK.md`). **Measured before the correlator was added** (session 4 adds a per-flow pivot read); not re-measured since |
+| Throughput benchmark (flows/s, Mbps) | Measured 2026-09-27 on the current code (correlator and hash chain included): ~860 flows/s, ~223 Mbps on CTU-13 s12 (botnet-only); 1,129 flows/s on mixed traffic; one core (`docs/BENCHMARK.md`) |

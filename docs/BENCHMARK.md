@@ -1,14 +1,11 @@
 # Throughput benchmark
 
-> **Scope note (session 4, 2026-09-26).** These figures were measured on the session-3 code.
-> Session 4 added campaign correlation, which reads each flow's pivots and one fan-in value per
-> endpoint, and a hash computation per stored alert. Throughput has **not** been re-measured
-> since. Re-run the series below on an idle machine before quoting a figure for the current code.
-
-Measured throughput of SIH26145 with the trained models (`docs/MODELS.md`) and batched ML
-inference. Every figure below was measured on 2026-09-26 on the machine named here, on an idle
-machine: no download, dump or training job was running (checked with `pgrep` and the load
-average before each series). The 2026-09-25 figures (single-row synthetic models, ~121 flows/s)
+Measured throughput of SIH26145 on the current code: trained models (`docs/MODELS.md`) with
+batched inference, ruleset 2.1.0, campaign correlation and the hash-chained alert log. Every figure
+below was measured on 2026-09-27 on the machine named here, on an idle machine: Docker Desktop was
+stopped, and no download, dump, build, browser or training job was running (checked with `pgrep`
+and the load average before each run; the 1-minute load stayed at or below 1.43). The session-3
+figures (2026-09-26, before correlation and the hash chain) and the session-2 figures (2026-09-25)
 are kept at the end for comparison. They are superseded.
 
 ## What is measured
@@ -25,8 +22,9 @@ are kept at the end for comparison. They are superseded.
    - the model row, taken at that flow's own scoring time.
 
    It then makes **one** LightGBM and **one** IsolationForest predict call for the batch
-   (`num_threads=1` / `n_jobs=1`), and runs the aggregator for each flow;
-5. SQLite WAL writes to a temp file.
+   (`num_threads=1` / `n_jobs=1`), and runs the aggregator and the campaign correlator for
+   each flow;
+5. SQLite WAL writes to a temp file. Each stored alert gets its SHA-256 chain hash.
 
 It reports:
 - **flows/s:** flows scored ÷ wall time.
@@ -62,7 +60,131 @@ It reports:
 
 ## Results
 
-### CTU-13 scenario 12, botnet hosts only (the session-2 procedure, rerun)
+### CTU-13 scenario 12, botnet hosts only
+
+| Run | Flags | Wall | flows/s | Mbps | pps | Drops | Alerts | Flush → alert p50 / p95 / p99 | Flush → scored p50 / p95 / p99 |
+|---|---|---|---|---|---|---|---|---|---|
+| Unthrottled #1 | — | 11.11 s | 803.5 | 208.30 | 31,709 | 0 (lossless) | 91 | 162 / 717 / 747 ms | 67 / 488 / 715 ms |
+| Unthrottled #2 | — | 10.16 s | 879.1 | 227.88 | 34,689 | 0 (lossless) | 91 | 336 / 1,386 / 1,388 ms | 270 / 889 / 1,206 ms |
+| Unthrottled #3 | — | 9.96 s | 895.9 | 232.25 | 35,353 | 0 (lossless) | 91 | 593 / 1,473 / 1,475 ms | 531 / 916 / 1,298 ms |
+| Paced, ~50% of capacity | `--speed 184` | 20.91 s | 426.9 | 110.68 | — | **0 / 8,927 (0.0%)** | 70 | **6.7 / 217 / 250 ms** | 127 / 244 / 261 ms |
+| Paced, ~2× capacity, 1k queue | `--speed 736 --queue-max 1000` | 10.12 s | 832.4 | 228.60 | — | **501 / 8,927 (5.6%)** | 40 | 645 / 1,123 / 1,194 ms | 307 / 1,243 / 1,415 ms |
+| Repeat (reproducibility) | — | 10.29 s | 867.9 | 224.99 | 34,249 | 0 (lossless) | 91 | 169 / 1,227 / 1,229 ms | 85 / 653 / 1,052 ms |
+
+**Sustained capacity on this machine: about 860 flows/s (803.5–895.9 over three runs, mean 859.5)
+and about 223 Mbps (208.3–232.3), on one core.** That is 7.6% below the session-3 mean of 929.8
+flows/s, measured before campaign correlation and the hash chain were added. The first run of the
+series was the slowest; runs 2 and 3 and the repeat lie within 3.3% of each other. The repeat run, made
+after the paced and overload runs, gave 867.9 flows/s: within 1.0% of the three-run mean, inside
+the 10% reproducibility check.
+
+**Detection latency at the operating point (paced, ~50% of capacity):** flow close takes 15 s
+idle or 60 s active (capture time), plus at most one 1 s tick. Then flush → alert is 6.7 ms p50,
+217 ms p95 and 250 ms p99.
+
+How to read the rows:
+- **Unthrottled latency** is queueing at saturation. The producer reads ahead and flows wait until
+  the consumer reaches them, so these latencies are a backlog, not a detection-latency claim.
+  They vary run to run because the backlog depends on how the one core is shared between producer
+  and consumer.
+- **Paced 184×** offers 184 × 2.33 ≈ 429 flows/s, about half the capacity (the speed is derived
+  from the measured mean as `0.5 × 859.5 ÷ 2.33`). Nothing is dropped.
+- **Overload at 736×** offers about 1,715 flows/s. The producer and the consumer share one core,
+  so the producer falls behind the replay clock (10.1 s wall against the 5.2 s schedule) rather
+  than filling the queue quickly. 5.6% of flows were dropped, every one counted (session 3: 1.8%
+  at 800× on the faster code). A capture longer than this one would keep the queue full and drop
+  more.
+- **Alert counts differ between paced and unthrottled runs** (70 and 91), and not only because
+  of drops. At 184× a 1 s wall-clock timer tick spans 184 s of capture time. Idle flows then
+  reach the FeatureStore up to ~184 s out of event order, which changes windowed features: the
+  paced run raised 70 C2 alerts and no LightGBM alert, the unthrottled runs 69 C2 and 22 LightGBM
+  alerts. At real-time speed a tick is 1 s of capture time. The paced rows measure latency and
+  drops; their alert mix is not representative (TODO). The demo replays at 2×, where the alert
+  list is identical to unthrottled (`scripts/demo_report.py`).
+- Unthrottled alert counts are 91, not session 3's 106: ruleset 2.1.0 (`docs/RULES.md`) raised
+  the C2 thresholds between the two series.
+
+### Largest scenario that completes: CTU-13 scenario 11, botnet hosts only (4.07 GB)
+
+| Run | Wall | flows/s | Mbps | pps | Drops | Alerts | Flush → alert |
+|---|---|---|---|---|---|---|---|
+| Unthrottled | 49.67 s | 5.7 | **676.57** | **79,361** | 0 | 1 (`THREAT_RECON_PORTSCAN`) | 71 ms (one alert) |
+
+This capture is two infected hosts ICMP-flooding one target: 3.94 million packets in only 281
+flows. It is packet-bound, so Mbps and packets/s are the meaningful figures, and it shows the
+ingest path sustaining about 677 Mbps of large packets on one core (session 3: 681). **Scenario 10
+(66 GB) was not run.** It is 16× the size of s11 and shows the same Rbot ICMP-flood behaviour, so
+it would add wall time without adding a new traffic mix. No figure is claimed for it.
+
+Detection note, not a throughput figure: no rule flagged the flood in this botnet-only capture.
+In the mixed-traffic CTU-13-Extended s11 capture, the flood is caught (`docs/RULES.md` §6). The
+few-source volumetric rule needs 5 closed windows of per-destination baseline, and the target first
+appears with the attack. This is the warm-up limit stated for PS (a).
+
+### Mixed traffic: CTU-13-Extended scenario 12, all hosts, headers only
+
+| Run | Wall | flows/s | Mbps (wire length) | pps | Drops | Alerts | Flush → alert p50 / p95 / p99 (saturated) |
+|---|---|---|---|---|---|---|---|
+| Unthrottled, `SIH26145_INTERNAL_CIDRS=147.32.0.0/16` | 480.22 s | **1,128.6** | **145.20** | 27,505 | 0 (lossless) | 6,247 | 8.7 / 10.7 / 12.3 s |
+
+This is the full university-link capture (background, normal and botnet hosts), not only the
+infected hosts. **Its Mbps is computed from each pcapng block's original packet length**, the
+size the traffic had on the wire. The capture is headers only (TCP cut at 54 bytes, UDP at 42,
+ICMP at 66), so the pipeline parsed far fewer bytes than that figure implies. flows/s is the
+comparable figure: 1,128.6, 8.7% below session 3's 1,235.5. Flows here are smaller and more numerous
+than in the botnet-only capture, so flows/s is higher and Mbps lower.
+
+Alerts: 5,274 C2-beacon, 813 LightGBM-only, 155 exfiltration and 5 DDoS, on 541,957 flows. Most
+fire on unlabelled background hosts. Precision against the CTU labels is in `docs/RULES.md` §4;
+this is an alert-volume observation, not a precision figure.
+
+## Profile: top five hot spots
+
+cProfile over the unthrottled scenario-12 run: 22.7 s under the profiler against about 10 s
+unprofiled, so the shares are indicative. Shares are cumulative time. cProfile sees only the main
+thread; SQLite writes on aiosqlite's worker thread are not included.
+
+| # | Where | Calls | Share | Why |
+|---|---|---|---|---|
+| 1 | `ingest/parser.py` `PacketParser.parse_packet` (dpkt Ethernet/IP/TCP unpack) | 352,266 | **36.5%** | Per-packet Python object construction in dpkt; the Ethernet/IP unpack alone is 25.0% |
+| 2 | `models/features.py` `model_row` (`store_features`) | 8,927 | **12.9%** | 30+ contract-checked store reads per flow, each rolling its window view |
+| 3 | `features/extractor.py` `FeatureExtractor.extract` | 8,927 | 11.3% | Per-flow numpy statistics on small arrays |
+| 4 | `flow/tracker.py` `FlowTracker.process_packet` | 352,266 | 9.0% | Per-packet dict lookup and counter updates |
+| 5 | IsolationForest `score_samples` (batched) | 210 | 8.9% | One call per batch over 100 trees; sklearn still dispatches per tree through joblib |
+
+What session 4 added: the campaign correlator (`correlate.py` `observe`) is **2.2%**, and the
+per-alert chain hash (`storage/chain.py` `record_hash`, 91 calls) rounds to 0.0%. For comparison:
+rules 4.3%, `FeatureStore.update` 4.0%, LightGBM prediction 2.9% and the aggregator 1.1%. The
+consumer drained smaller batches in this run than in session 3 (210 IsolationForest calls against
+138), and per-call model overhead grew with them.
+
+## Reproduce
+
+```bash
+B=~/NewProjects/26145-data/bench/s5
+E=~/NewProjects/26145-data/extracted/CTU-13-Dataset
+P=$E/12/botnet-capture-20110819-bot.pcap
+uv run python scripts/benchmark.py $P --json $B/s12-u1.json                  # capacity (run 3 times)
+uv run python scripts/benchmark.py $P --speed 184 --json $B/s12-paced.json   # ~50% of capacity
+uv run python scripts/benchmark.py $P --speed 736 --queue-max 1000           # overload, drops counted
+uv run python scripts/benchmark.py $P --profile $B/s12.prof                  # profile (rates not quotable)
+uv run python scripts/benchmark.py $E/11/botnet-capture-20110818-bot-2.pcap  # largest completed
+SIH26145_INTERNAL_CIDRS=147.32.0.0/16 uv run python scripts/benchmark.py \
+  ~/NewProjects/26145-data/ctu13-extended/capture20110819.truncated.pcap     # mixed traffic
+```
+
+`~/NewProjects/26145-data/bench/s5/run.sh` runs the whole series (session-3 series: `bench/final/`). It also
+asserts the repeat run is within 10% of the three-run mean. It derives the
+paced speeds from the measured capacity as `0.5 × flows/s ÷ (capture flows ÷ capture span)`, and
+4× that for overload. Use the same rule on a different machine. The CTU-13-Extended download
+commands are in `docs/MODELS.md` §6.
+
+## Superseded: 2026-09-26 (session 3)
+
+Measured on the session-3 code, before campaign correlation and the hash-chained alert log,
+with the pre-2.1.0 rule thresholds. Same machine and captures. Kept as recorded.
+
+#### CTU-13 scenario 12, botnet hosts only (the session-2 procedure, rerun)
 
 | Run | Flags | Wall | flows/s | Mbps | pps | Drops | Alerts | Flush → alert p50 / p95 / p99 | Flush → scored p50 / p95 / p99 |
 |---|---|---|---|---|---|---|---|---|---|
@@ -100,7 +222,7 @@ How to read the rows:
   runs 22 LightGBM alerts and no DDoS alert. At real-time speed a tick is 1 s of capture time.
   The paced rows measure latency and drops; their alert mix is not representative (TODO).
 
-### Largest scenario that completes: CTU-13 scenario 11, botnet hosts only (4.07 GB)
+#### Largest scenario that completes: CTU-13 scenario 11, botnet hosts only (4.07 GB)
 
 | Run | Wall | flows/s | Mbps | pps | Drops | Alerts | Flush → alert |
 |---|---|---|---|---|---|---|---|
@@ -117,7 +239,7 @@ In the mixed-traffic CTU-13-Extended s11 capture, the flood is caught (`docs/RUL
 rule needs 5 closed windows of per-destination baseline, and the target first appears with the
 attack. This is the warm-up limit stated for PS (a).
 
-### Mixed traffic: CTU-13-Extended scenario 12, all hosts, headers only
+#### Mixed traffic: CTU-13-Extended scenario 12, all hosts, headers only
 
 | Run | Wall | flows/s | Mbps (wire length) | pps | Drops | Alerts | Flush → alert p50 / p95 / p99 (saturated) |
 |---|---|---|---|---|---|---|---|
@@ -135,7 +257,7 @@ flows. The rules have not been tuned on real traffic, and most of these fire on 
 hosts, which carry no label. This is an alert-volume observation for the TODO, not a precision
 figure.
 
-## Profile: top five hot spots (after batching)
+### Profile: top five hot spots (after batching)
 
 cProfile over the unthrottled scenario-12 run: 22.2 s under the profiler against 9.6 s
 unprofiled, so the shares are indicative. Shares are cumulative time. cProfile sees only the main
@@ -153,26 +275,6 @@ For comparison: rules 4.5%, `FeatureStore.update` 4.0%, the aggregator 1.2%, and
 prediction 0.4%. Session 2's two largest items were IsolationForest (73.6%) and RandomForest
 (19.1%) single-row predicts. Batching removed that per-call overhead, and packet parsing is now
 the largest cost.
-
-## Reproduce
-
-```bash
-B=~/NewProjects/26145-data/bench/final
-E=~/NewProjects/26145-data/extracted/CTU-13-Dataset
-P=$E/12/botnet-capture-20110819-bot.pcap
-uv run python scripts/benchmark.py $P --json $B/s12-u1.json                  # capacity (run 3 times)
-uv run python scripts/benchmark.py $P --speed 200 --json $B/s12-paced.json   # ~50% of capacity
-uv run python scripts/benchmark.py $P --speed 800 --queue-max 1000           # overload, drops counted
-uv run python scripts/benchmark.py $P --profile $B/s12.prof                  # profile (rates not quotable)
-uv run python scripts/benchmark.py $E/11/botnet-capture-20110818-bot-2.pcap  # largest completed
-SIH26145_INTERNAL_CIDRS=147.32.0.0/16 uv run python scripts/benchmark.py \
-  ~/NewProjects/26145-data/ctu13-extended/capture20110819.truncated.pcap     # mixed traffic
-```
-
-`~/NewProjects/26145-data/bench/final/run.sh` runs the whole series in this order. It derives the
-paced speeds from the measured capacity as `0.5 × flows/s ÷ (capture flows ÷ capture span)`, and
-4× that for overload. Use the same rule on a different machine. The CTU-13-Extended download
-commands are in `docs/MODELS.md` §6.
 
 ## Superseded: 2026-09-25 (session 2)
 
