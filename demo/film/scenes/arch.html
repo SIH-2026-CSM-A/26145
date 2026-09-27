@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+  #head { position: absolute; top: 64px; left: 100px; }
+  #head h2 { font-size: 56px; font-weight: 600; margin-top: 8px; }
+  .box { position: absolute; width: 330px; height: 150px; padding: 22px 24px; opacity: .18; }
+  .box b { display: block; font-size: 32px; font-weight: 600; }
+  .box span { display: block; font-size: 22px; color: var(--dim); margin-top: 6px; line-height: 1.3; }
+  .box.on { opacity: 1; }
+  svg { position: absolute; inset: 0; }
+  #contract { position: absolute; left: 100px; right: 100px; top: 800px; padding: 28px 36px; opacity: 0; border-color: rgba(52,211,153,.45); }
+  #contract .t { font-size: 34px; font-weight: 600; }
+  #contract .ex { margin-top: 14px; font-size: 26px; color: var(--dim); display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+  .pill { padding: 6px 16px; border-radius: 999px; font-size: 24px; border: 1px solid; }
+</style></head><body>
+<div id="head"><div class="eyebrow">How SAAKSHI works</div><h2>One way in. Nothing out.</h2></div>
+<svg width="1920" height="1080" id="wires"></svg>
+<div id="boxes"></div>
+<div id="contract" class="glass">
+  <div class="t">The unidirectional feature contract: every feature declares what the link must show for it.</div>
+  <div class="ex"><span class="pill mono" style="color:#5ee6ff;border-color:rgba(94,230,255,.5)">outbound/inbound byte ratio</span>
+    <span>needs both directions</span><span id="c2" style="opacity:0">→ reply not captured → never guessed →</span>
+    <span id="c3" class="pill" style="opacity:0;color:#a78bfa;border-color:rgba(167,139,250,.5)">substitute: egress spike + rare destination</span></div>
+</div>
+<script src="../../../dashboard/node_modules/animejs/dist/bundles/anime.umd.min.js"></script>
+<script src="harness.js"></script>
+<script>
+// the pipeline as a snake: row 1 left to right, row 2 right to left
+const B = [
+  ['Tap + diode', 'passive, receive only'], ['Capture', 'packets, headers only'], ['Flows', 'both halves matched when seen'],
+  ['Feature store', 'per host · server · pair'], ['Rules + model', 'score every flow'],
+  ['Alerts', 'evidence + what the link saw'], ['Campaigns', 'grouped on rare pivots'], ['Hash-chained log', 'SHA-256, tamper-evident'], ['Dashboard', 'read-only']];
+const W = 330, X1 = [100, 460, 820, 1180, 1540], Y1 = 250, Y2 = 530;
+const pos = B.map((_, i) => (i < 5 ? [X1[i], Y1] : [X1[8 - i + 1] ?? 0, Y2]));
+pos[5] = [X1[4], Y2]; pos[6] = [X1[3], Y2]; pos[7] = [X1[2], Y2]; pos[8] = [X1[1], Y2];
+const boxes = B.map(([t, s], i) => {
+  const d = document.createElement('div'); d.className = 'box glass';
+  d.style.left = `${pos[i][0]}px`; d.style.top = `${pos[i][1]}px`; d.innerHTML = `<b>${t}</b><span>${s}</span>`;
+  document.getElementById('boxes').appendChild(d); return d;
+});
+const NS = 'http://www.w3.org/2000/svg', wires = [];
+for (let i = 0; i < 8; i++) {
+  const [ax, ay] = pos[i], [bx, by] = pos[i + 1];
+  let d;
+  if (i === 4) d = `M${ax + W / 2},${ay + 150} L${bx + W / 2},${by}`;               // down the right side
+  else if (i < 4) d = `M${ax + W},${ay + 75} L${bx},${by + 75}`;
+  else d = `M${ax},${ay + 75} L${bx + W},${by + 75}`;
+  const p = document.createElementNS(NS, 'path'); p.setAttribute('d', d); p.setAttribute('stroke', '#5ee6ff');
+  p.setAttribute('stroke-width', 4); p.setAttribute('fill', 'none'); p.setAttribute('stroke-dasharray', 200); p.setAttribute('stroke-dashoffset', 200);
+  document.getElementById('wires').appendChild(p); wires.push(p);
+}
+window.build = (tl, cue) => {
+  const light = (i, at) => {
+    tl.add(boxes[i], { opacity: [0.18, 1], scale: [0.96, 1], duration: 500 }, at);
+    if (i > 0) tl.add(wires[i - 1], { strokeDashoffset: [200, 0], duration: 500, ease: 'inOutQuad' }, at - 350);
+  };
+  light(0, cue(0, 0.2)); light(1, cue(0, 1.4));
+  light(2, cue(1, 0.3)); light(3, cue(1, 2.4));
+  light(4, cue(2, 0.2));
+  light(5, cue(3, 0.1)); light(6, cue(3, 2.2));
+  light(7, cue(4, 1.2)); light(8, cue(4, 2.8));
+  tl.add('#contract', { opacity: [0, 1], translateY: [30, 0], duration: 700 }, cue(5, 0.8))
+    .add('#c2', { opacity: [0, 1], duration: 500 }, cue(6, 0.3))
+    .add('#c3', { opacity: [0, 1], scale: [0.9, 1], duration: 500, ease: 'outBack' }, cue(7, 0.2));
+};
+</script></body></html>

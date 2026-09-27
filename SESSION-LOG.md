@@ -1,6 +1,6 @@
 # Session Log
 
-## 2026-09-27 — Claude Code (Opus 5.5) — session 6: a dashboard judges remember (+ film, in progress)
+## 2026-09-27 — Claude Code (Opus 5.5) — session 6: a dashboard judges remember, and a narrated film
 
 **Agent:** Claude Code (Anthropic, model Opus 5.5). Branch `main`, starting at `977301e` (236 tests).
 No other agent worked on this repo. The pipeline is frozen at `idea-deck-v3`: no detection, flow,
@@ -69,8 +69,36 @@ feature, model or storage code changed.
 - **Shell kills.** `pkill -f`/`pgrep -f` with a pattern that is also in the shell's own command
   line kills the shell (exit 144). A bracket trick (`[p]ort 18001`) avoids it.
 
+### Part D: the narrated film (after the tag)
+- Owner picks and edits:
+  - voice Kokoro `af_heart` at 0.9 speed;
+  - the script edits for beats 1, 5, 7 and 8, with the cut rule "only if over 3:40".
+- Length: Kokoro pads every line with ~0.9 s of silence (37.7 s in total). Trimming that to a
+  0.3 s gap brought the film to **3:38.5 (218.5 s) with no sentence cut**. Neither of the owner's
+  conditional cuts was needed.
+- `demo/film/` holds the tooling. The mp4, WAVs and frames sit in the git-ignored `out/`.
+  - `tts.py`: one WAV per line, with phoneme overrides;
+  - `plan.py`: each segment lasts as long as its narration;
+  - `render-scenes.mjs`: the five HTML scenes, seeked frame by frame with anime.js;
+  - `film-record.mjs`: one real `serve --speed 5` replay via Chrome screencast (29 fps), with alert
+    and spark-landing times logged;
+  - `assemble.py`: cuts with "time skip · N s cut" badges, −16 LUFS, ASS subtitles at 1080p plus
+    an `.srt`;
+  - `check.py`: a contact sheet and cue/onset sync.
+- **Checks on the output:**
+  - H.264 1080p30 + stereo AAC 48 kHz;
+  - integrated −16.4 LUFS;
+  - all 44 subtitle cues within 53 ms of the speech onset;
+  - the contact sheet was reviewed.
+- **Found and fixed:**
+  - an SRT burned through libass lays out on a 384×288 canvas, which gave one-word lines at ~135 px;
+    the fix was a native 1920×1080 ASS;
+  - spaCy's model download went into the product `.venv`; it was removed and put in the TTS venv;
+  - the false-positive outline cut through labels, so it was re-recorded.
+- The tamper scene types the real transcript. `render_verify_log.py OUT.json` runs the same real
+  commands as the PNG render and writes the transcript.
+
 ### Not done / next
-- Part D, the narrated film: script, voice samples, recording, assembly.
 - The VM redeploy (owner).
 
 ## 2026-09-27 — Claude Code (Opus 5.5) — session 5: re-benchmark, PPT stills, demo video, HTTPS profile

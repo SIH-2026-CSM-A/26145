@@ -1,0 +1,21 @@
+/* The dashboard's tokens (dashboard/src/index.css) and bundled fonts, for the film's HTML scenes. */
+@font-face { font-family: 'Space Grotesk'; font-weight: 300 700; src: url('../../../dashboard/node_modules/@fontsource-variable/space-grotesk/files/space-grotesk-latin-wght-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 100 800; src: url('../../../dashboard/node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2') format('woff2'); }
+:root { --ink: #040814; --deep: #080e20; --panel: #0e1832; --line: rgba(96,140,220,.25); --fg: #e6edf7; --dim: #9aa8c0;
+  --faint: #68768f; --safe: #34d399; --brand: #5ee6ff;
+  --scan: #38bdf8; --c2: #a78bfa; --dga: #fbbf24; --tun: #fb923c; --tls: #2dd4bf; --exf: #f472b6; --ddos: #f43f5e; }
+* { box-sizing: border-box; margin: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; }
+body { font-family: 'Space Grotesk', sans-serif; color: var(--fg); position: relative;
+  background: radial-gradient(1200px 600px at 20% -10%, rgba(40,80,180,.18), transparent 60%),
+              radial-gradient(900px 500px at 100% 110%, rgba(120,60,200,.12), transparent 60%), var(--ink); }
+body::before { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(rgba(96,140,220,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(96,140,220,.05) 1px, transparent 1px);
+  background-size: 48px 48px; mask-image: radial-gradient(ellipse at 50% 40%, black 30%, transparent 85%); }
+.mono { font-family: 'JetBrains Mono', monospace; font-variant-ligatures: none; }
+.glass { border-radius: 24px; border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(14,24,50,.78), rgba(14,24,50,.5));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.02), 0 10px 40px -12px rgba(0,0,0,.6), 0 0 32px -12px rgba(94,230,255,.14); }
+.eyebrow { font-size: 22px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); }
+.chip { display: inline-flex; align-items: center; gap: 12px; padding: 12px 24px; border-radius: 999px; font-size: 30px; font-weight: 600; }
+.chip i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }

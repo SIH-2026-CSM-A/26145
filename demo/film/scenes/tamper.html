@@ -1,0 +1,37 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+  #term { position: absolute; left: 100px; right: 100px; top: 60px; height: 700px; overflow: hidden; }
+  #bar { display: flex; align-items: center; gap: 24px; padding: 22px 36px; border-bottom: 1px solid var(--line); }
+  #bar b { font-size: 30px; letter-spacing: .16em; } #bar span { font-size: 24px; color: var(--dim); }
+  #body { padding: 22px 40px; font-size: 24px; line-height: 1.42; white-space: pre; }
+  .cmd { color: var(--fg); font-weight: 700; } .cmd::before { content: '$ '; color: var(--brand); }
+  .cont { color: var(--dim); } .out { color: var(--dim); } .ok { color: var(--safe); font-weight: 700; } .bad { color: var(--ddos); font-weight: 700; }
+  .l { opacity: 0; }
+  .note { position: absolute; left: 100px; right: 100px; padding: 24px 32px; font-size: 32px; font-weight: 500; opacity: 0; display: flex; gap: 20px; align-items: center; }
+  .note i { font-style: normal; font-size: 22px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; padding: 6px 14px; border-radius: 999px; }
+  #flash { position: absolute; inset: 0; background: rgba(244,63,94,.18); opacity: 0; pointer-events: none; }
+</style></head><body>
+<div id="term" class="glass"><div id="bar"><b>SAAKSHI</b><span>tamper-evident alert log · every command below ran for real</span></div><div id="body" class="mono"></div></div>
+<div id="n1" class="note glass" style="top:800px"><i style="color:#5ee6ff;background:rgba(94,230,255,.1)">catches</i>any edit made without rebuilding the whole chain</div>
+<div id="n2" class="note glass" style="top:915px"><i style="color:#a78bfa;background:rgba(167,139,250,.12)">next step</i>signed checkpoints, which stop a full rebuild too (being built)</div>
+<div id="flash"></div>
+<script src="../../../dashboard/node_modules/animejs/dist/bundles/anime.umd.min.js"></script>
+<script src="harness.js"></script>
+<script>
+const body = document.getElementById('body');
+const add = (cls, text) => { const d = document.createElement('div'); d.className = `l ${cls}`; d.textContent = text; body.appendChild(d); return d; };
+window.build = (tl, cue, cfg) => {
+  const [an, ok, edit, bad] = cfg.data; // real transcript from scripts/render_verify_log.py
+  const pre = [add('cmd', an.cmd), add('out', an.out.split('\n')[0]), add('cmd', ok.cmd), add('ok', ok.out)];
+  pre.forEach((e, i) => tl.add(e, { opacity: [0, 1], duration: 250 }, 100 + i * 120));
+  const [first, ...rest] = edit.cmd.split('\n');
+  const ed = [add('cmd', first), ...rest.map((r) => add('cont', `> ${r}`)), add('out', edit.out)];
+  ed.forEach((e, i) => tl.add(e, { opacity: [0, 1], duration: 150 }, cue(0, 0.2 + i * 0.26)));
+  tl.add(add('cmd', bad.cmd), { opacity: [0, 1], duration: 200 }, cue(1, 0.1));
+  const b = add('bad', bad.out);
+  tl.add(b, { opacity: [0, 1], translateX: [-14, 0], duration: 350 }, cue(1, 0.9))
+    .add('#flash', { opacity: [0, 1, 0], duration: 900, ease: 'outQuad' }, cue(1, 0.9))
+    .add('#n1', { opacity: [0, 1], translateY: [20, 0], duration: 600 }, cue(2, 0.1))
+    .add('#n2', { opacity: [0, 1], translateY: [20, 0], duration: 600 }, cue(3, 0.2));
+};
+</script></body></html>

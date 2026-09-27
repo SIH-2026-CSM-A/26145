@@ -1,0 +1,83 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+  #title { position: absolute; top: 56px; left: 0; right: 0; text-align: center; opacity: 0; }
+  #title h1 { font-size: 128px; font-weight: 700; letter-spacing: .2em; }
+  #title p { font-size: 32px; color: var(--dim); margin-top: 8px; }
+  svg { position: absolute; left: 0; top: 330px; }
+  .lbl { font-size: 30px; font-weight: 600; fill: var(--fg); }
+  .sub { font-size: 24px; fill: var(--dim); }
+  #chips { position: absolute; left: 90px; right: 90px; top: 820px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px 28px; }
+  .chip { opacity: 0; justify-content: flex-start; font-size: 28px; white-space: nowrap; }
+</style></head><body>
+<div id="title"><h1>SAAKSHI</h1><p>NTRO · SIH 26145 · threats in one-way (unidirectional) IP traffic</p></div>
+<svg width="1920" height="500" viewBox="0 0 1920 500">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5ee6ff"/></marker></defs>
+  <g id="net" opacity="0">
+    <rect x="150" y="60" width="420" height="300" rx="28" fill="rgba(14,24,50,.6)" stroke="rgba(96,140,220,.3)"/>
+    <text x="360" y="40" text-anchor="middle" class="lbl">Critical network</text>
+    <g id="hosts"></g>
+  </g>
+  <g id="mon" opacity="0">
+    <rect x="1350" y="60" width="420" height="300" rx="28" fill="rgba(14,24,50,.6)" stroke="rgba(94,230,255,.45)"/>
+    <text x="1560" y="40" text-anchor="middle" class="lbl">Monitor (enclave)</text>
+    <text x="1560" y="215" text-anchor="middle" class="sub">sees every packet</text>
+    <circle cx="1560" cy="160" r="30" fill="rgba(94,230,255,.25)" stroke="#5ee6ff" stroke-width="3"/>
+  </g>
+  <g id="gate" opacity="0">
+    <rect x="938" y="60" width="10" height="220" rx="4" fill="#5ee6ff"/><rect x="972" y="60" width="10" height="220" rx="4" fill="#5ee6ff"/>
+    <text x="960" y="40" text-anchor="middle" class="lbl">Data diode</text>
+    <path d="M935,180 L985,210 L935,240" fill="none" stroke="#5ee6ff" stroke-width="5"/>
+  </g>
+  <line id="fwd" x1="570" y1="210" x2="1350" y2="210" stroke="#5ee6ff" stroke-width="4" marker-end="url(#ar)" stroke-dasharray="780" stroke-dashoffset="780"/>
+  <g id="dots"></g>
+  <g id="back" opacity="0">
+    <line x1="1350" y1="330" x2="570" y2="330" stroke="#68768f" stroke-width="3" stroke-dasharray="14 12"/>
+    <rect x="760" y="304" width="400" height="52" rx="26" fill="#040814" stroke="rgba(52,211,153,.5)"/>
+    <g transform="translate(790,318)"><rect x="0" y="10" width="22" height="16" rx="3" fill="#34d399"/><path d="M4,10 V6 a7,7 0 0 1 14,0 V10" fill="none" stroke="#34d399" stroke-width="3"/></g>
+    <text x="830" y="339" class="sub" style="fill:#e6edf7;font-size:24px">back to the network: <tspan class="mono" style="fill:#34d399;font-weight:700">0 bytes</tspan></text>
+  </g>
+</svg>
+<div id="chips">
+  <span class="chip glass" style="color:var(--ddos)"><i style="background:var(--ddos)"></i>(a) Floods (DDoS)</span>
+  <span class="chip glass" style="color:var(--c2)"><i style="background:var(--c2)"></i>(b) C2 beacons</span>
+  <span class="chip glass" style="color:var(--dga)"><i style="background:var(--dga)"></i>(c) DGA and DNS tunnels</span>
+  <span class="chip glass" style="color:var(--tls)"><i style="background:var(--tls)"></i>(d) Malware in encrypted sessions</span>
+  <span class="chip glass" style="color:var(--scan)"><i style="background:var(--scan)"></i>(e) Scanning</span>
+  <span class="chip glass" style="color:var(--exf)"><i style="background:var(--exf)"></i>(f) Data leaving the network</span>
+</div>
+<script src="../../../dashboard/node_modules/animejs/dist/bundles/anime.umd.min.js"></script>
+<script src="harness.js"></script>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+let seed = 5; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+for (let i = 0; i < 18; i++) {
+  const c = document.createElementNS(NS, 'circle');
+  c.setAttribute('cx', 190 + rnd() * 340); c.setAttribute('cy', 90 + rnd() * 240); c.setAttribute('r', 7); c.setAttribute('fill', '#9cc4ff');
+  document.getElementById('hosts').appendChild(c);
+}
+const dots = Array.from({ length: 26 }, (_, i) => {
+  const c = document.createElementNS(NS, 'circle'); c.setAttribute('r', 5); c.setAttribute('fill', '#5ee6ff');
+  document.getElementById('dots').appendChild(c); return { c, ph: i / 26, dy: (rnd() - 0.5) * 24 };
+});
+let flowFrom = 1e9;
+window.build = (tl, cue) => {
+  tl.add('#net', { opacity: [0, 1], duration: 600 }, 0)
+    .add('#mon', { opacity: [0, 1], duration: 600 }, 150)
+    .add('#gate', { opacity: [0, 1], duration: 600 }, cue(0, 1.2))
+    .add('#fwd', { strokeDashoffset: [780, 0], duration: 1400, ease: 'inOutQuad' }, cue(0, 1.6))
+    .add('#back', { opacity: [0, 1], duration: 700 }, cue(1, 2.0))
+    .add('#title', { opacity: [0, 1], translateY: [24, 0], duration: 900 }, cue(2, 0.1));
+  const chips = [...document.querySelectorAll('.chip')];
+  [1.5, 2.6, 3.9].forEach((d, i) => tl.add(chips[i], { opacity: [0, 1], scale: [0.85, 1], duration: 500, ease: 'outBack' }, cue(3, d)));
+  [0.2, 2.9, 3.9].forEach((d, i) => tl.add(chips[3 + i], { opacity: [0, 1], scale: [0.85, 1], duration: 500, ease: 'outBack' }, cue(4, d)));
+  flowFrom = cue(0, 2.6) / 1000;
+};
+// dots only ever move left to right, and only once the forward line is drawn
+window.frame = (t) => {
+  for (const d of dots) {
+    const on = t > flowFrom, u = ((t - flowFrom) * 0.28 + d.ph) % 1;
+    d.c.setAttribute('cx', 575 + u * 770); d.c.setAttribute('cy', 210 + d.dy * Math.sin(Math.PI * u));
+    d.c.setAttribute('opacity', on ? Math.min(1, (t - flowFrom) * 2) * Math.sin(Math.PI * u) : 0);
+  }
+};
+</script></body></html>

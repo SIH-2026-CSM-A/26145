@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+  #c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  h1 { font-size: 150px; font-weight: 700; letter-spacing: .2em; opacity: 0; }
+  .a { font-size: 44px; font-weight: 500; margin-top: 18px; opacity: 0; }
+  .g { font-size: 36px; margin-top: 56px; color: #5ee6ff; opacity: 0; }
+  .d { font-size: 32px; margin-top: 16px; color: var(--dim); opacity: 0; }
+</style></head><body>
+<div id="c"><h1>SAAKSHI</h1><div class="a">SIH26145 · Team F.R.I.E.N.D.S</div>
+<div class="g mono">github.com/SIH-2026-CSM-A/26145</div><div class="d">Live demo: <span class="mono" style="color:#e6edf7">8.234.101.133.sslip.io</span></div></div>
+<script src="../../../dashboard/node_modules/animejs/dist/bundles/anime.umd.min.js"></script>
+<script src="harness.js"></script>
+<script>
+window.build = (tl) => {
+  tl.add('h1', { opacity: [0, 1], translateY: [20, 0], duration: 800 }, 100)
+    .add('.a', { opacity: [0, 1], duration: 600 }, 500)
+    .add('.g', { opacity: [0, 1], duration: 600 }, 900)
+    .add('.d', { opacity: [0, 1], duration: 600 }, 1200);
+};
+</script></body></html>

@@ -8,7 +8,7 @@ Every command shown is run for real, in a temp dir, and its real output is drawn
 analyze the demo capture into a DB, verify-log passes, one byte of one alert's stored JSON is
 changed with Python's sqlite3 module, and verify-log reports BROKEN at that index.
 
-Usage: uv run --script scripts/render_verify_log.py OUT.png
+Usage: uv run --script scripts/render_verify_log.py OUT.png   (or OUT.json: the transcript, for the film)
 """
 
 import os
@@ -113,6 +113,10 @@ def render(transcript: list[tuple[str, str]], path: str, size: int = 26) -> None
 if __name__ == "__main__":
     with tempfile.TemporaryDirectory() as tmp:
         t = run_steps(Path(tmp))
-    render(t, sys.argv[1])
+    if sys.argv[1].endswith(".json"):  # the transcript itself, for the film's terminal scene
+        import json
+        Path(sys.argv[1]).write_text(json.dumps([{"cmd": c, "out": o} for c, o in t], indent=1))
+    else:
+        render(t, sys.argv[1])
     print("\n".join(o for _, o in t))
     print("wrote", sys.argv[1])
