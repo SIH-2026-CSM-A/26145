@@ -51,7 +51,7 @@ flowchart LR
     D --> A[Evidence aggregator<br/>alert v2]
     A --> S[(SQLite WAL)]
     A --> API[FastAPI REST + SSE]
-    API --> UI[React dashboard<br/>Cytoscape.js campaign graph]
+    API --> UI[React dashboard<br/>live link hero, SVG campaign map]
 ```
 
 ## 4. Ingest
@@ -332,10 +332,14 @@ save with an existing `alert_id` is refused.
 
 ## 12. API and dashboard
 
-FastAPI, read-only `GET` routes under `/api/v1`:
+FastAPI, read-only `GET` routes under `/api/v1` (each also answers `HEAD`, so `curl -I` works;
+the SSE stream is GET only):
 - `health`, `metrics`, `alerts`, `alerts/{alert_id}`;
 - `campaigns`, `campaigns/{id}`, `hosts/{ip}/timeline`;
 - `contract` (feature states), `chain/verify`;
+- `stats/classes`: count and latest event time per threat class over the whole log (the class tiles);
+- `chain/blocks?alert_id=&around=`: seq, class, prev_hash and record_hash of the links around one
+  alert (the case file draws them). Hashes only, no flow data;
 - `stream/alerts` (SSE: `alert` events, plus `reset` when a demo loop restarts).
 
 **Read-only surface.** The app has no write, upload, analyze or reset route. Every other
@@ -344,26 +348,41 @@ no CORS middleware: the built dashboard is served by the same app at `/`, and Vi
 `/api`, so browsers refuse cross-origin reads. SSE (server → dashboard) is the only push
 channel.
 
-**Dashboard** (React + Vite, all JS/CSS bundled, system fonts, no request leaves the origin; the
-smoke test fails if one does):
-- **Facts strip** from `/metrics`: flows/s, Mbps, queue drops, link reverse visibility, the
-  replayed capture and speed, and "Bytes sent onto the monitored link: 0". The last one is true
-  by construction: `tests/ingest/test_no_transmit.py` fails if the capture or ingest path gains a
-  socket, a send or a writable `open`.
-- **Cytoscape.js campaign graph:** hosts and the other ends as nodes, alerts as class-coloured
-  edges, campaigns as compound boxes (the newest 12). The campaign list shows refused merges.
-- **Host timeline:** click a node to see its observed ATT&CK stages.
-- **Alert drawer:** click an edge or alert to see:
-  - the class in plain words, severity, and the evidence (value against normal or threshold);
-  - contract chips (computable / degraded / substituted / unavailable);
-  - the flow's observability in words;
+**Dashboard** (React 19 + Vite; three.js, fonts and every library bundled, no request leaves the
+origin; the smoke test fails if one does). Two full-height screens:
+- **The one-way link, live** (three.js via @react-three/fiber; a 2D canvas fallback when WebGL is
+  missing, or with `?nogl`):
+  - the production network, the diode and the enclave, with dots moving left to right only;
+  - 1 dot ≈ 5 flows at the flows/s `/metrics` measures;
+  - an alert's flow crosses as a spark in its class colour and flies to its threat-class tile;
+  - the return path is a dashed lane with a lock and "Bytes sent back: 0". That is true by
+    construction: `tests/ingest/test_no_transmit.py` fails if the capture or ingest path gains a
+    socket, a send or a writable `open`.
+- **Six PS threat tiles** (a)–(f): count (`stats/classes`), the latest alert's entity and first
+  evidence row at or past its reference, and what the detector looks at. "watching" at 0.
+- **KPI strip:** flows/s with a sparkline, Mbps, queue drops, reply-direction visibility and the
+  alert log's chain state. The demo rate is labelled as such, next to the measured capacity.
+- **Campaign ribbon**, and the **replay banner** ("Replay of demo.pcap at N× real time · loop k").
+- **Campaign map** (plain SVG, deterministic): one star per campaign, with the host in the middle
+  and the other ends on a ring. Spokes are class-coloured and draw in when the alert arrives.
+  Labels sit outside the ring (the smoke test fails on any overlap).
+- **Stage timeline:** click a host for swim lanes per ATT&CK tactic, with "Observed history.
+  Nothing here predicts the next step."
+- **Case file:** click a line to see:
+  - the plain-English headline, severity and a confidence ring;
+  - the evidence as value vs threshold/normal bars, with contract chips;
+  - "What this link could see" as request/reply arrows (the reply is greyed when not captured);
   - the ML top features;
-  - `record_hash` with the chain-verified badge.
+  - the hash-chain links around the alert, with a Verify button that recomputes
+    `/chain/verify`.
 - **Model card:** its figures are quoted from `docs/MODELS.md`, and
   `tests/training/test_model_card_facts.py` fails on drift.
-- **Checks:** `scripts/smoke.sh` builds the UI, serves a generated capture and runs the headless
-  Playwright smoke test (`dashboard/tests/smoke.mjs`): the graph renders, and clicking an edge
-  opens the drawer.
+- **Checks:** `scripts/smoke.sh` builds the UI, serves a generated capture paced at 60× and runs
+  the headless Playwright smoke test (`dashboard/tests/smoke.mjs`):
+  - the hero renders, and a tile pulses on a live alert;
+  - the map draws with no overlapping labels;
+  - a click opens the case file, and Verify recomputes the chain;
+  - `?nogl` renders.
 
 ## 13. Measurement policy
 
@@ -445,6 +464,6 @@ smoke test fails if one does):
 | Pipeline → API → SSE wiring | Implemented: `sih26145 serve` runs both in one process; `/metrics` reads the live pipeline; browser-checked |
 | Tamper-evident alert log | Implemented: SHA-256 hash chain, `verify-log`, `export` bundle with a Section 63 data sheet (§11) |
 | Campaign correlation, host stage | Implemented (§8a): IDF pivots, common-infrastructure refusal, observed ATT&CK stages; `/campaigns`, `/hosts/{ip}/timeline` |
-| Dashboard | Implemented (§12): campaign graph, alert drawer, host timeline, live facts strip, model card; same-origin, read-only; Playwright smoke test |
+| Dashboard | Implemented (§12, rebuilt in session 6): live one-way-link hero, PS threat tiles, KPI strip, SVG campaign map, stage timeline, case file, model card; same-origin, read-only; Playwright smoke test |
 | Demo package | Implemented: committed `demo/demo.pcap` (real CTU-13 background plus generated attacks), `serve --loop`, Dockerfile, docker-compose with an optional `https` Caddy profile, `DEPLOY.md`; scripted demo video and PPT stills (`docs/media/`). Not deployed yet |
 | Throughput benchmark (flows/s, Mbps) | Measured 2026-09-27 on the current code (correlator and hash chain included): ~860 flows/s, ~223 Mbps on CTU-13 s12 (botnet-only); 1,129 flows/s on mixed traffic; one core (`docs/BENCHMARK.md`) |

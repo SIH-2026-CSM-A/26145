@@ -15,7 +15,6 @@
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.1",
     "animejs": "^4.5.0",
-    "cytoscape": "^3.34.3",
     "lucide-react": "^0.475.0",
     "motion": "^13.4.4",
     "playwright": "^1.63.0",

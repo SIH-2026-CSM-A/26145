@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional, Set
 from pathlib import Path as FsPath
 
 from fastapi import FastAPI, Query, HTTPException, Path
+from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
@@ -210,6 +211,40 @@ async def stream_alerts():
             broadcaster.unsubscribe(subscriber_queue)
 
     return EventSourceResponse(event_generator())
+
+
+async def _query(sql: str, params=()) -> list:
+    await storage.init_db()
+    conn = await storage.get_connection()
+    async with conn.execute(sql, params) as cur:
+        return list(await cur.fetchall())
+
+
+@app.get("/api/v1/stats/classes")
+async def class_stats():
+    """Alert count and latest event time per threat class, over the whole log (for the class tiles)."""
+    rows = await _query("SELECT threat_class, COUNT(*), MAX(timestamp) FROM alerts GROUP BY threat_class")
+    return {"classes": {c: {"count": n, "last_seen": t} for c, n, t in rows}}
+
+
+@app.get("/api/v1/chain/blocks")
+async def chain_blocks(alert_id: str = Query(..., max_length=64), around: int = Query(2, ge=0, le=5)):
+    """The hash-chain links around one alert: seq, class, prev_hash, record_hash. Hashes only, no flow data."""
+    hit = await _query("SELECT seq FROM alerts WHERE alert_id = ?", (alert_id,))
+    if not hit:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    seq = hit[0][0]
+    rows = await _query("SELECT seq, alert_id, threat_class, prev_hash, record_hash FROM alerts "
+                        "WHERE seq BETWEEN ? AND ? ORDER BY seq", (seq - around, seq + around))
+    return {"seq": seq, "blocks": [dict(zip(("seq", "alert_id", "threat_class", "prev_hash", "record_hash"), r))
+                                   for r in rows]}
+
+
+# HEAD on every GET route (curl -I); without it HEAD fell through to the static mount and got 404.
+# The SSE stream is left GET-only: a HEAD there would hold the connection open for nothing.
+for _r in app.routes:
+    if isinstance(_r, APIRoute) and "GET" in _r.methods and _r.path != "/api/v1/stream/alerts":
+        _r.methods.add("HEAD")
 
 
 # The built dashboard (dashboard/dist), same origin as the API. Mounted last so /api wins.
