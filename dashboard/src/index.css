@@ -1,8 +1,55 @@
+@import '@fontsource-variable/space-grotesk';
+@import '@fontsource-variable/jetbrains-mono';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* "SOC at night": ink background, glass panels with a 1 px border and a soft glow.
+   Threat-class colours are in src/lib/labels.js and used everywhere a class appears. */
+:root {
+  --ink: 4 8 20;        /* page */
+  --deep: 8 14 32;      /* sunken areas */
+  --panel: 14 24 50;    /* glass panels, used at ~55% */
+  --line: 96 140 220;   /* borders, used at 15-30% */
+  --fg: 230 237 247;
+  --dim: 154 168 192;
+  --faint: 104 118 146;
+  --safe: 52 211 153;   /* the one-way guarantee */
+  --brand: 94 230 255;
+  color-scheme: dark;
+}
+
+html, body, #root { height: 100%; }
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background-color: #020617;
+  @apply font-sans text-fg antialiased;
+  font-size: 16px;
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgb(40 80 180 / 0.18), transparent 60%),
+    radial-gradient(900px 500px at 100% 110%, rgb(120 60 200 / 0.12), transparent 60%),
+    rgb(var(--ink));
+}
+/* faint grid + grain behind everything */
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image:
+    linear-gradient(rgb(var(--line) / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--line) / 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 50% 40%, black 30%, transparent 85%);
+}
+#root { position: relative; z-index: 1; }
+
+@layer components {
+  .glass {
+    @apply rounded-2xl border border-line/20;
+    background: linear-gradient(180deg, rgb(var(--panel) / 0.72), rgb(var(--panel) / 0.45));
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.02) inset, 0 10px 40px -12px rgb(0 0 0 / 0.6), 0 0 32px -12px rgb(var(--brand) / 0.12);
+  }
+  .eyebrow { @apply text-xs font-semibold uppercase tracking-[0.14em] text-dim; }
+  .kpi { @apply font-sans font-semibold tabular-nums leading-none tracking-tight; }
+  .chip { @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }

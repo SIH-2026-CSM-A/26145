@@ -1,26 +1,20 @@
 /** @type {import('tailwindcss').Config} */
+// Design tokens live in src/index.css (:root); Tailwind only names them.
+const v = (n) => `rgb(var(--${n}) / <alpha-value>)`;
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
       colors: {
-        soc: {
-          bg: "#0b0f19",
-          card: "#111827",
-          border: "#1f2937",
-          accent: "#3b82f6",
-          text: "#f3f4f6",
-          muted: "#9ca3af",
-          critical: "#ef4444",
-          high: "#f97316",
-          medium: "#eab308",
-          low: "#10b981",
-        }
-      }
+        ink: v('ink'), deep: v('deep'), panel: v('panel'), line: v('line'),
+        fg: v('fg'), dim: v('dim'), faint: v('faint'), safe: v('safe'), brand: v('brand'),
+      },
+      fontFamily: {
+        sans: ['"Space Grotesk Variable"', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono Variable"', 'ui-monospace', 'monospace'],
+      },
+      fontSize: { xs: ['0.875rem', '1.25rem'] }, // 14 px floor: nothing on screen is smaller
     },
   },
   plugins: [],
-}
+};
