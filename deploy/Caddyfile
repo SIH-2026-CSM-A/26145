@@ -1,0 +1,5 @@
+# HTTPS front for the demo (compose profile "https"). SIH_HOSTNAME is e.g. 34.93.10.20.sslip.io:
+# sslip.io resolves it to that IP, so Caddy can get a Let's Encrypt certificate without a domain.
+{$SIH_HOSTNAME} {
+	reverse_proxy sensor:8000
+}

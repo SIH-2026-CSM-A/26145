@@ -3,7 +3,9 @@ services:
     build: .
     image: sih26145-demo:latest
     ports:
-      - "${SIH_PORT:-8000}:8000"   # host port; override with SIH_PORT=18000 if 8000 is taken
+      # host port; override with SIH_PORT=18000 if 8000 is taken. With the https profile set
+      # SIH_BIND=127.0.0.1 so the app is reachable only through Caddy.
+      - "${SIH_BIND:-0.0.0.0}:${SIH_PORT:-8000}:8000"
     restart: unless-stopped
     read_only: true
     tmpfs:
@@ -12,3 +14,33 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+
+  # Optional HTTPS: docker compose --profile https up -d (needs SIH_HOSTNAME, see DEPLOY.md §4)
+  caddy:
+    image: caddy:2
+    profiles: ["https"]
+    depends_on:
+      - sensor
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SIH_HOSTNAME: ${SIH_HOSTNAME:-}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+
+volumes:
+  caddy_data:
+  caddy_config:
