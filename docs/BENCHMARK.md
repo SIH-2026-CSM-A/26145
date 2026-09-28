@@ -104,6 +104,33 @@ How to read the rows:
 - Unthrottled alert counts are 91, not session 3's 106: ruleset 2.1.0 (`docs/RULES.md`) raised
   the C2 thresholds between the two series.
 
+### Same procedure on a non-WSL Linux VM (2026-09-28)
+
+The s12 unthrottled procedure (three runs + one repeat, `scripts/benchmark.py`, same capture,
+commit `6de6a3d`, whose pipeline code is unchanged since the laptop series; models `ctu13x5-lgbm-if-1.0.0`) on a temporary
+Google Cloud VM, to show the figure is not a WSL artefact. The VM was created for this run and
+deleted afterwards. Data: `26145-data/bench/s7-gcp/` (JSON per run, `lscpu`, load log).
+
+| | Laptop (session 5 series) | GCP VM `e2-standard-4` |
+|---|---|---|
+| CPU | Intel Core i5-13450HX (Raptor Lake, 2023) | Intel Xeon @ 2.20 GHz, family 6 model 79 (Broadwell, 2016), KVM guest |
+| Cores | 16 logical visible; the pipeline uses one core | 4 vCPUs (2 cores × 2 threads); the pipeline uses one core |
+| OS / kernel | WSL2, Linux 6.18.33.2-microsoft-standard-WSL2 | Ubuntu 24.04.5 LTS, Linux 7.0.0-1011-gcp |
+| Python | 3.13.14 | 3.13.15 (uv-managed); numpy, dpkt, scikit-learn, lightgbm, aiosqlite at the same versions |
+| Unthrottled runs, flows/s | 803.5 / 879.1 / 895.9 (mean **859.5**) | 340.1 / 345.7 / 349.4 (mean **345.1**) |
+| Mbps (mean) | 222.8 | 89.5 |
+| Packets/s (mean) | 33,917 | 13,618 |
+| Average packet size (wire bytes ÷ packets) | 821.2 B (289,266,098 ÷ 352,266) | 821.2 B (same capture) |
+| Repeat run | 867.9 flows/s (1.0% from the mean) | 335.5 flows/s (2.8% from the mean) |
+| Drops / alerts | 0 (lossless) / 91 | 0 (lossless) / 91 |
+
+The VM is 2.5× slower per core than the laptop, on the same code and capture, and raises the same
+91 alerts. The pipeline is single-threaded Python, so per-core speed decides it: a 2016 Broadwell
+vCPU at 2.2 GHz against a 2023 laptop core rated up to 4.6 GHz. The CPUs differ, so this run does
+not isolate any WSL2 effect; it shows the pipeline runs and gives identical detections on native
+Linux. **Capacity is machine-dependent**: size a deployment from a run on its own
+hardware, using this procedure.
+
 ### Largest scenario that completes: CTU-13 scenario 11, botnet hosts only (4.07 GB)
 
 | Run | Wall | flows/s | Mbps | pps | Drops | Alerts | Flush → alert |
