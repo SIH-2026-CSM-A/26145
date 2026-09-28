@@ -16,19 +16,19 @@
 <svg width="1920" height="1080" id="wires"></svg>
 <div id="boxes"></div>
 <div id="contract" class="glass">
-  <div class="t">The unidirectional feature contract: every feature declares what the link must show for it.</div>
+  <div class="t">If the link did not show it, it is never guessed.</div>
   <div class="ex"><span class="pill mono" style="color:#5ee6ff;border-color:rgba(94,230,255,.5)">outbound/inbound byte ratio</span>
-    <span>needs both directions</span><span id="c2" style="opacity:0">→ reply not captured → never guessed →</span>
-    <span id="c3" class="pill" style="opacity:0;color:#a78bfa;border-color:rgba(167,139,250,.5)">substitute: egress spike + rare destination</span></div>
+    <span>needs both directions</span><span id="c2" style="opacity:0">→ reply not captured →</span>
+    <span id="c3" class="pill" style="opacity:0;color:#a78bfa;border-color:rgba(167,139,250,.5)">the alert says so, and uses a declared substitute</span></div>
 </div>
 <script src="../../../dashboard/node_modules/animejs/dist/bundles/anime.umd.min.js"></script>
 <script src="harness.js"></script>
 <script>
 // the pipeline as a snake: row 1 left to right, row 2 right to left
 const B = [
-  ['Tap + diode', 'passive, receive only'], ['Capture', 'packets, headers only'], ['Flows', 'both halves matched when seen'],
+  ['Tap + diode', 'passive, receive only'], ['Capture', 'packets; nothing decrypted'], ['Flows', 'both halves matched when seen'],
   ['Feature store', 'per host · server · pair'], ['Rules + model', 'score every flow'],
-  ['Alerts', 'evidence + what the link saw'], ['Campaigns', 'grouped on rare pivots'], ['Hash-chained log', 'SHA-256, tamper-evident'], ['Dashboard', 'read-only']];
+  ['Alerts', 'evidence + what the link saw'], ['Campaigns', 'one story per campaign'], ['Hash-chained log', 'an edit breaks the chain'], ['Dashboard', 'read-only']];
 const W = 330, X1 = [100, 460, 820, 1180, 1540], Y1 = 250, Y2 = 530;
 const pos = B.map((_, i) => (i < 5 ? [X1[i], Y1] : [X1[8 - i + 1] ?? 0, Y2]));
 pos[5] = [X1[4], Y2]; pos[6] = [X1[3], Y2]; pos[7] = [X1[2], Y2]; pos[8] = [X1[1], Y2];
@@ -48,6 +48,16 @@ for (let i = 0; i < 8; i++) {
   p.setAttribute('stroke-width', 4); p.setAttribute('fill', 'none'); p.setAttribute('stroke-dasharray', 200); p.setAttribute('stroke-dashoffset', 200);
   document.getElementById('wires').appendChild(p); wires.push(p);
 }
+// the fast lane: packets counted every second, straight from capture to alerts
+const fl = document.createElement('div'); fl.className = 'box glass'; fl.style.left = '100px'; fl.style.top = `${Y2}px`;
+fl.style.borderColor = 'rgba(244,63,94,.55)'; fl.innerHTML = '<b style="color:#fda4af">Fast lane</b><span>floods + scans, counted every second</span>';
+document.getElementById('boxes').appendChild(fl);
+const flw = [`M${X1[1] + W / 2},${Y1 + 150} C${X1[1] + W / 2},${Y1 + 230} ${100 + W / 2},${Y2 - 80} ${100 + W / 2},${Y2}`,
+             `M${100 + W / 2},${Y2 + 150} L${100 + W / 2},${Y2 + 200} L${X1[4] + W / 2},${Y2 + 200} L${X1[4] + W / 2},${Y2 + 150}`].map((d) => {
+  const p = document.createElementNS(NS, 'path'); p.setAttribute('d', d); p.setAttribute('stroke', '#f43f5e'); p.setAttribute('stroke-width', 4);
+  p.setAttribute('fill', 'none'); p.setAttribute('stroke-dasharray', 2400); p.setAttribute('stroke-dashoffset', 2400);
+  document.getElementById('wires').appendChild(p); return p;
+});
 window.build = (tl, cue) => {
   const light = (i, at) => {
     tl.add(boxes[i], { opacity: [0.18, 1], scale: [0.96, 1], duration: 500 }, at);
@@ -55,11 +65,15 @@ window.build = (tl, cue) => {
   };
   light(0, cue(0, 0.2)); light(1, cue(0, 1.4));
   light(2, cue(1, 0.3)); light(3, cue(1, 2.4));
-  light(4, cue(2, 0.2));
-  light(5, cue(3, 0.1)); light(6, cue(3, 2.2));
-  light(7, cue(4, 1.2)); light(8, cue(4, 2.8));
-  tl.add('#contract', { opacity: [0, 1], translateY: [30, 0], duration: 700 }, cue(5, 0.8))
-    .add('#c2', { opacity: [0, 1], duration: 500 }, cue(6, 0.3))
-    .add('#c3', { opacity: [0, 1], scale: [0.9, 1], duration: 500, ease: 'outBack' }, cue(7, 0.2));
+  tl.add(flw[0], { strokeDashoffset: [2400, 0], duration: 900, ease: 'inOutQuad' }, cue(2, 0.3))
+    .add(fl, { opacity: [0.18, 1], scale: [0.96, 1], duration: 500 }, cue(2, 1.0))
+    .add(flw[1], { strokeDashoffset: [2400, 0], duration: 1400, ease: 'inOutQuad' }, cue(2, 2.2));
+  light(4, cue(3, 0.2));
+  light(5, cue(4, 0.1)); light(6, cue(4, 2.4));
+  tl.add(boxes[6], { scale: [1, 1.06, 1], duration: 900 }, cue(5, 0.3));
+  light(7, cue(6, 0.3)); light(8, cue(6, 2.6));
+  tl.add('#contract', { opacity: [0, 1], translateY: [30, 0], duration: 700 }, cue(7, 0.8))
+    .add('#c2', { opacity: [0, 1], duration: 500 }, cue(8, 0.3))
+    .add('#c3', { opacity: [0, 1], scale: [0.9, 1], duration: 500, ease: 'outBack' }, cue(8, 1.2));
 };
 </script></body></html>

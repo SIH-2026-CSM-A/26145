@@ -85,8 +85,20 @@ def live_windows(p: dict, ev: dict) -> dict:
     n = round(p["chain"]["dur"] * FPS)
     sizes = [n // 5 + (1 if i < n % 5 else 0) for i in range(5)]
     w["chain"] = [(landing(a) - 0.66 * k / FPS, k / FPS) for a, k in zip(chain, sizes)]
-    w["flood"] = [(landing(first("THREAT_DDOS_VOLUME")) - 3.4, p["flood"]["dur"])]
-    for k in ("map", "case", "card", "fp"):
+    # the flood: the provisional alert arriving outlined, then the confirming alert turning it solid on
+    # "turns solid". One continuous window when both fit; else two, with a time-skip card between
+    prov = next(a for a in alerts if a["cls"] == "THREAT_DDOS_VOLUME" and a.get("prov"))
+    conf = next(a for a in alerts if a["cls"] == "THREAT_DDOS_VOLUME" and a.get("confirms") == prov["id"])
+    c = p["flood"]["cues"]
+    start = conf["t"] - (c[2]["at"] - 0.2)
+    if prov["t"] - start <= c[1]["at"]:
+        w["flood"] = [(start, p["flood"]["dur"])]
+    else:
+        w["flood"] = [(prov["t"] - 1.5, c[2]["at"]), (conf["t"] - 0.3, p["flood"]["dur"] - c[2]["at"])]
+    # the chain's last piece ends where the flood footage begins (continuous, no cut)
+    a, d = w["chain"][-1]
+    w["chain"][-1] = (min(a, w["flood"][0][0] - d), d)
+    for k in ("map", "case"):
         w[k] = [(M[k], p[k]["dur"])]
     return w
 

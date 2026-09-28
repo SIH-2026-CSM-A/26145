@@ -14,25 +14,27 @@ GAP, LEAD, TAIL = 0.3, 0.5, 0.6  # seconds: between lines, before the first, aft
 # (segment id, source, line indices from script.md in order). Scenes are HTML pages rendered frame
 # by frame; live segments are cut from the one real replay recording.
 SEGMENTS = [
-    ("hook", "scene", range(0, 5)),
-    ("arch", "scene", range(5, 13)),
-    ("quiet", "live", range(13, 16)),
-    ("scan", "live", range(16, 18)),
-    ("chain", "live", range(18, 21)),
-    ("flood", "live", range(21, 22)),
-    ("map", "live", range(22, 25)),
-    ("case", "live", range(25, 30)),
-    ("tamper", "scene", range(30, 34)),
-    ("card", "live", range(34, 37)),
-    ("fp", "live", range(37, 39)),
-    ("numbers", "scene", range(39, 43)),
-    ("end", "scene", range(43, 44)),
+    ("problem", "scene", range(0, 11)),
+    ("threats", "scene", range(11, 18)),
+    ("arch", "scene", range(18, 27)),
+    ("quiet", "live", range(27, 30)),
+    ("scan", "live", range(30, 32)),
+    ("chain", "live", range(32, 35)),
+    ("flood", "live", range(35, 39)),
+    ("map", "live", range(39, 42)),
+    ("case", "live", range(42, 47)),
+    ("tamper", "scene", range(47, 52)),
+    ("safe", "scene", range(52, 57)),
+    ("numbers", "scene", range(57, 61)),
+    ("why", "scene", range(61, 64)),
+    ("end", "scene", range(64, 65)),
 ]
 
 
 def plan(lines_json: Path = HERE / "out" / "wav" / "lines.json") -> list[dict]:
     rows = json.loads(lines_json.read_text())
-    assert len(rows) == 44, f"script has {len(rows)} lines; SEGMENTS expects 44"
+    n = SEGMENTS[-1][2].stop
+    assert len(rows) == n, f"script has {len(rows)} lines; SEGMENTS expects {n}"
     out, t = [], 0.0
     for sid, kind, idx in SEGMENTS:
         cues, c = [], LEAD

@@ -1,0 +1,116 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+  #head { position: absolute; top: 56px; left: 100px; }
+  svg#d { position: absolute; left: 0; top: 150px; }
+  .lbl { font-size: 34px; font-weight: 600; fill: var(--fg); }
+  .sub { font-size: 26px; fill: var(--dim); }
+  .net { opacity: 0; }
+  #nope { position: absolute; left: 1290px; top: 560px; width: 560px; display: flex; flex-direction: column; gap: 14px; }
+  #nope div { opacity: 0; font-size: 30px; padding: 10px 22px; border-radius: 14px; border: 1px solid rgba(244,63,94,.45); color: #fda4af; background: rgba(244,63,94,.07); }
+  #tbl { position: absolute; left: 100px; top: 640px; width: 1100px; padding: 30px 40px; opacity: 0; }
+  #tbl .h { display: grid; grid-template-columns: 1fr 80px 1fr; font-size: 26px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+  #tbl .r { display: grid; grid-template-columns: 1fr 80px 1fr; font-size: 34px; margin-top: 18px; align-items: center; }
+  #tbl .r > * { opacity: 0; }
+  #tbl .a { position: relative; width: fit-content; }
+  #tbl .a s { position: absolute; left: -6px; right: -6px; top: 52%; height: 4px; background: var(--ddos); transform: scaleX(0); transform-origin: left; }
+  #tbl .b { color: #fbbf24; }
+  #tbl .arr { color: var(--faint); text-align: center; }
+  #q { position: absolute; left: 0; right: 0; top: 330px; text-align: center; opacity: 0; }
+  #q .e { font-size: 30px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); }
+  #q .t { font-size: 76px; font-weight: 600; margin-top: 24px; line-height: 1.2; }
+  #name { position: absolute; left: 0; right: 0; top: 300px; text-align: center; opacity: 0; }
+  #name h1 { font-size: 150px; font-weight: 700; letter-spacing: .2em; }
+  #name p { font-size: 40px; color: var(--dim); margin-top: 6px; }
+  #traits { position: absolute; left: 0; right: 0; top: 700px; display: flex; justify-content: center; gap: 30px; }
+  #traits .chip { opacity: 0; font-size: 34px; color: var(--fg); }
+</style></head><body>
+<div id="head"><div class="eyebrow">The problem</div></div>
+<div id="stage">
+<svg id="d" width="1920" height="480" viewBox="0 0 1920 480">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5ee6ff"/></marker></defs>
+  <g class="net" id="n0" transform="translate(100,20)">
+    <rect width="440" height="110" rx="22" fill="rgba(14,24,50,.7)" stroke="rgba(96,140,220,.35)"/>
+    <path d="M50,28 L78,38 V60 C78,76 64,86 50,92 C36,86 22,76 22,60 V38 Z" fill="none" stroke="#9cc4ff" stroke-width="4"/>
+    <text x="110" y="68" class="lbl">Defence systems</text></g>
+  <g class="net" id="n1" transform="translate(100,150)">
+    <rect width="440" height="110" rx="22" fill="rgba(14,24,50,.7)" stroke="rgba(96,140,220,.35)"/>
+    <path d="M56,22 L34,60 H52 L44,90 L70,48 H52 L60,22 Z" fill="#fbbf24"/>
+    <text x="110" y="68" class="lbl">Power grids</text></g>
+  <g class="net" id="n2" transform="translate(100,280)">
+    <rect width="440" height="110" rx="22" fill="rgba(14,24,50,.7)" stroke="rgba(96,140,220,.35)"/>
+    <path d="M50,90 L50,40 M30,28 Q50,8 70,28 M20,18 Q50,-12 80,18" fill="none" stroke="#2dd4bf" stroke-width="4"/><circle cx="50" cy="40" r="6" fill="#2dd4bf"/>
+    <text x="110" y="68" class="lbl">Telecom cores</text></g>
+  <g id="gate" opacity="0">
+    <rect x="938" y="60" width="10" height="300" rx="4" fill="#5ee6ff"/><rect x="972" y="60" width="10" height="300" rx="4" fill="#5ee6ff"/>
+    <text x="960" y="36" text-anchor="middle" class="lbl">Data diode</text>
+    <path d="M935,180 L985,210 L935,240" fill="none" stroke="#5ee6ff" stroke-width="5"/>
+  </g>
+  <line id="fwd" x1="545" y1="210" x2="1285" y2="210" stroke="#5ee6ff" stroke-width="5" marker-end="url(#ar)" stroke-dasharray="740" stroke-dashoffset="740"/>
+  <g id="hw" opacity="0"><text x="960" y="410" text-anchor="middle" class="sub" style="fill:#e6edf7">hardware, not software</text></g>
+  <g id="back" opacity="0">
+    <line x1="1285" y1="310" x2="545" y2="310" stroke="#68768f" stroke-width="3" stroke-dasharray="14 12"/>
+    <rect x="1030" y="286" width="240" height="48" rx="24" fill="#040814" stroke="rgba(52,211,153,.5)"/>
+    <g transform="translate(1052,298)"><rect x="0" y="10" width="20" height="14" rx="3" fill="#34d399"/><path d="M4,10 V6 a6,6 0 0 1 12,0 V10" fill="none" stroke="#34d399" stroke-width="3"/></g>
+    <text x="1084" y="318" class="sub" style="fill:#34d399;font-weight:600">nothing back</text>
+  </g>
+  <g id="mon" opacity="0">
+    <rect x="1290" y="60" width="560" height="300" rx="28" fill="rgba(14,24,50,.7)" stroke="rgba(94,230,255,.5)"/>
+    <text x="1570" y="36" text-anchor="middle" class="lbl">Security monitor</text>
+    <rect x="1490" y="120" width="160" height="104" rx="10" fill="none" stroke="#5ee6ff" stroke-width="4"/><path d="M1540,250 H1600 M1570,224 V250" stroke="#5ee6ff" stroke-width="4"/>
+    <text id="copy" x="1570" y="310" text-anchor="middle" class="sub" opacity="0" style="fill:#e6edf7">sees only a copy of the traffic</text>
+  </g>
+  <g id="dots"></g>
+</svg>
+<div id="nope"><div>✕ cannot ask a question</div><div>✕ cannot send a probe</div><div>✕ cannot block anything</div></div>
+<div id="tbl" class="glass">
+  <div class="h"><span>Most security tools expect</span><span></span><span style="color:#fbbf24">On a one-way link</span></div>
+  <div class="r"><span class="a">to see every reply<s></s></span><span class="arr">→</span><span class="b">replies can be missing</span></div>
+  <div class="r"><span class="a">to read the content<s></s></span><span class="arr">→</span><span class="b">most traffic is encrypted</span></div>
+  <div class="r"><span class="a">to check things online<s></s></span><span class="arr">→</span><span class="b">there is no internet</span></div>
+</div>
+</div>
+<div id="q"><div class="e">NTRO · problem statement 26145</div><div class="t">Can AI find cyber threats<br>in one-way traffic alone?</div></div>
+<div id="name"><h1>SAAKSHI</h1><p>the Hindi word for “witness”</p></div>
+<div id="traits"><span class="chip glass">it watches</span><span class="chip glass">it never talks back</span><span class="chip glass">every alert comes with its evidence</span></div>
+<script src="../../../dashboard/node_modules/animejs/dist/bundles/anime.umd.min.js"></script>
+<script src="harness.js"></script>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const dots = Array.from({ length: 18 }, (_, i) => {
+  const c = document.createElementNS(NS, 'circle'); c.setAttribute('r', 6); c.setAttribute('fill', '#5ee6ff');
+  document.getElementById('dots').appendChild(c); return { c, ph: i / 18, dy: ((i * 37) % 11 - 5) * 3 };
+});
+let flowFrom = 1e9;
+window.build = (tl, cue, cfg) => {
+  const at = (i, f) => (cfg.cues[i].at + f * cfg.cues[i].dur) * 1000;
+  [0.28, 0.55, 0.8].forEach((f, k) => tl.add(`#n${k}`, { opacity: [0, 1], duration: 600 }, at(0, f)));
+  tl.add('#gate', { opacity: [0, 1], duration: 600 }, at(1, 0.3))
+    .add('#fwd', { strokeDashoffset: [740, 0], duration: 1400, ease: 'inOutQuad' }, at(1, 0.6))
+    .add('#hw', { opacity: [0, 1], duration: 600 }, at(2, 0.05))
+    .add('#back', { opacity: [0, 1], duration: 700 }, at(2, 0.45))
+    .add('#mon', { opacity: [0, 1], duration: 700 }, at(3, 0.45))
+    .add('#copy', { opacity: [0, 1], duration: 500 }, at(4, 0.05));
+  [...document.querySelectorAll('#nope div')].forEach((e, k) => tl.add(e, { opacity: [0, 1], translateX: [-20, 0], duration: 450 }, at(4, 0.38 + k * 0.2)));
+  tl.add('#tbl', { opacity: [0, 1], translateY: [30, 0], duration: 700 }, at(5, 0.1));
+  const rows = [...document.querySelectorAll('#tbl .r')];
+  rows.forEach((r, k) => tl.add(r.children[0], { opacity: [0, 1], duration: 400 }, at(6, 0.12 + k * 0.28)));
+  rows.forEach((r, k) => {
+    tl.add(r.children[0].querySelector('s'), { scaleX: [0, 1], duration: 450 }, at(7, 0.05 + k * 0.3));
+    tl.add([r.children[1], r.children[2]], { opacity: [0, 1], duration: 450 }, at(7, 0.1 + k * 0.3));
+  });
+  tl.add('#stage', { opacity: [1, 0], duration: 800 }, at(8, 0.0))
+    .add('#head', { opacity: [1, 0], duration: 600 }, at(8, 0.0))
+    .add('#q', { opacity: [0, 1], translateY: [24, 0], duration: 900 }, at(8, 0.05))
+    .add('#q', { opacity: [1, 0], duration: 600 }, at(9, 0.0))
+    .add('#name', { opacity: [0, 1], scale: [0.96, 1], duration: 900 }, at(9, 0.05));
+  [...document.querySelectorAll('#traits .chip')].forEach((e, k) => tl.add(e, { opacity: [0, 1], translateY: [16, 0], duration: 500 }, at(10, 0.02 + k * 0.3)));
+  flowFrom = at(1, 0.9) / 1000;
+};
+window.frame = (t) => {
+  for (const d of dots) {
+    const on = t > flowFrom, u = ((t - flowFrom) * 0.25 + d.ph) % 1;
+    d.c.setAttribute('cx', 550 + u * 730); d.c.setAttribute('cy', 210 + d.dy * Math.sin(Math.PI * u));
+    d.c.setAttribute('opacity', on ? Math.min(1, (t - flowFrom) * 2) * Math.sin(Math.PI * u) : 0);
+  }
+};
+</script></body></html>

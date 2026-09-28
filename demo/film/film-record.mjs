@@ -1,8 +1,8 @@
 // Records the live part of the film: one real replay of demo/demo.pcap at 5x through the real
 // pipeline, captured frame by frame with Chrome's screencast (1920x1080). It logs when each alert
-// arrives and when its spark lands on its tile, then performs the scripted clicks (map + timeline,
-// exfiltration case file + Verify, model card, the university C2 alerts), holding each state for as
-// long as its narration in out/plan.json. Writes out/live.mp4 (30 fps CFR) and out/live-events.json.
+// arrives (and whether it is a provisional fast-lane alert or confirms one) and when its spark lands
+// on its tile, then performs the scripted clicks (map + timeline, exfiltration case file + Verify),
+// holding each state for as long as its narration in out/plan.json. Writes out/live.mp4 (30 fps CFR) and out/live-events.json.
 // Usage: node film-record.mjs [PORT]
 import { chromium } from '../../dashboard/node_modules/playwright/index.mjs';
 import { spawn, spawnSync } from 'node:child_process';
@@ -43,15 +43,18 @@ mark('page');
 await p.evaluate(() => {
   window.__ev = [];
   const es = new EventSource('/api/v1/stream/alerts');
-  es.addEventListener('alert', (e) => { const a = JSON.parse(e.data); window.__ev.push({ t: Date.now() / 1000, kind: 'alert', cls: a.threat_class, src: a.flow?.src_ip, dst: a.flow?.dst_ip, id: a.alert_id }); });
+  es.addEventListener('alert', (e) => { const a = JSON.parse(e.data); window.__ev.push({ t: Date.now() / 1000, kind: 'alert', cls: a.threat_class, src: a.flow?.src_ip, dst: a.flow?.dst_ip, id: a.alert_id, prov: !!a.provisional, confirms: a.confirms || null }); });
   new MutationObserver((ms) => ms.forEach((m) => window.__ev.push({ t: Date.now() / 1000, kind: 'land', tile: m.target.dataset.testid, n: +m.target.dataset.pulses })))
     .observe(document.querySelector('[data-testid="threat-tiles"]'), { attributes: true, subtree: true, attributeFilter: ['data-pulses'] });
 });
 
-// wait for the flood's spark to land: all four campaigns are in
+// the flood: the fast lane's provisional alert (outlined), then the flow-lane alert confirming it
 await p.waitForFunction(() => +document.querySelector('[data-testid="tile-a"]').dataset.pulses > 0, null, { timeout: 400000, polling: 100 });
 mark('flood_landed');
-await sleep((plan.flood.dur + 0.5) * 1000);
+await p.waitForFunction(() => /fast lane flagged it/.test(document.querySelector('[data-testid="tile-a-latest"]')?.textContent || ''),
+  null, { timeout: 400000, polling: 100 });
+mark('flood_confirmed');
+await sleep((plan.flood.dur - plan.flood.cues[2].at + 1.5) * 1000);
 
 // 3e: the map, then the host's stage timeline
 const hold = (id, extra = 1.2) => sleep((plan[id].dur + extra) * 1000);
@@ -78,43 +81,6 @@ await sleep((verifyAt - 0.5) * 1000);
 await p.getByTestId('verify-button').click();
 mark('verify');
 await sleep((plan.case.dur - verifyAt + 1.2) * 1000);
-await p.getByLabel('Close alert').click();
-await p.evaluate(() => window.scrollTo(0, 0));
-await sleep(1500);
-
-// 6a: the model card; outline the held-out result when its line is spoken
-mark('card');
-await sleep(300);
-await p.getByTestId('model-card-button').click();
-await sleep((plan.card.cues[1].at + 0.2 - 0.3) * 1000);
-await p.evaluate(() => {
-  const c = [...document.querySelectorAll('[data-testid="model-card"] .eyebrow')].find((e) => e.textContent === 'Held-out result')?.closest('.rounded-xl');
-  if (c) { c.style.transition = 'box-shadow .4s'; c.style.boxShadow = '0 0 0 3px #fbbf24, 0 0 40px -6px #fbbf24'; }
-});
-await hold('card', 0.5 - plan.card.cues[1].at);
-await p.getByLabel('Close model card').click();
-await sleep(600);
-
-// 6b: the map with the three C2 alerts on university hosts outlined
-mark('fp');
-await p.evaluate(() => document.getElementById('map').scrollIntoView({ behavior: 'smooth' }));
-await sleep((plan.fp.cues[0].at + 0.3) * 1000);
-await p.evaluate(() => {
-  const NS = 'http://www.w3.org/2000/svg';
-  for (const g of document.querySelectorAll('[data-testid="campaign-map"] [data-campaign]')) {
-    const title = g.querySelector('[data-label="title"]')?.textContent || '';
-    if (!title.startsWith('147.32.')) continue;
-    // around the nodes and their labels (not the glow), with a margin
-    const bs = [...g.querySelectorAll('[data-ip]')].map((e) => e.getBBox());
-    const x0 = Math.min(...bs.map((b) => b.x)) - 28, y0 = Math.min(...bs.map((b) => b.y)) - 28;
-    const x1 = Math.max(...bs.map((b) => b.x + b.width)) + 28, y1 = Math.max(...bs.map((b) => b.y + b.height)) + 28;
-    const r = document.createElementNS(NS, 'rect');
-    Object.entries({ x: x0, y: y0, width: x1 - x0, height: y1 - y0, rx: 28, fill: 'none', stroke: '#fbbf24', 'stroke-width': 4, 'stroke-dasharray': '14 10' })
-      .forEach(([k, v]) => r.setAttribute(k, v));
-    g.appendChild(r);
-  }
-});
-await hold('fp', 0.8 - plan.fp.cues[0].at);
 mark('end');
 
 await cdp.send('Page.stopScreencast');

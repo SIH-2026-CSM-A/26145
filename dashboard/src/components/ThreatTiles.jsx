@@ -12,7 +12,10 @@ export default function ThreatTiles({ stats, pulse, tileRefs, alerts }) {
       {TILES.map((t) => {
         const color = classInfo(t.classes[0]).color;
         const rows = t.classes.map((c) => stats?.[c]).filter(Boolean);
-        const count = rows.reduce((s, r) => s + r.count, 0);
+        // stats refresh when a spark lands; never show fewer than the flow-lane alerts already received,
+        // so a confirmed alert does not drop back to "watching" while its spark is in flight
+        const count = Math.max(rows.reduce((s, r) => s + r.count, 0),
+                               alerts.filter((a) => !a.provisional && t.classes.includes(a.threat_class)).length);
         const k = pulse[t.id] || 0;
         const latest = alerts.find((a) => t.classes.includes(a.threat_class)); // alerts are newest first
         // fast lane: a provisional alert is drawn outlined until a flow-lane alert confirms it

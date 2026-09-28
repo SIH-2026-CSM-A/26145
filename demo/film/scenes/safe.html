@@ -1,0 +1,28 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+  #head { position: absolute; top: 64px; left: 100px; opacity: 0; } #head h2 { font-size: 56px; font-weight: 600; margin-top: 8px; }
+  #grid { position: absolute; left: 100px; right: 100px; top: 260px; display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
+  .card { display: flex; gap: 36px; align-items: center; padding: 40px 44px; height: 300px; opacity: 0; }
+  .card svg { flex: none; width: 120px; height: 120px; }
+  .card h3 { font-size: 42px; font-weight: 600; line-height: 1.15; }
+  .card p { font-size: 30px; color: var(--dim); margin-top: 12px; line-height: 1.3; }
+</style></head><body>
+<div id="head"><div class="eyebrow">Safe by design</div><h2>Built for places where trust matters</h2></div>
+<div id="grid">
+  <div class="card glass" id="k0"><svg viewBox="0 0 120 120"><path d="M60,10 L100,24 V58 C100,84 82,100 60,110 C38,100 20,84 20,58 V24 Z" fill="rgba(94,230,255,.1)" stroke="#5ee6ff" stroke-width="6"/><path d="M42,60 L55,73 L80,46" fill="none" stroke="#5ee6ff" stroke-width="7"/></svg>
+    <div><h3>No high alert from the AI alone</h3><p>a rule must see the evidence too</p></div></div>
+  <div class="card glass" id="k1"><svg viewBox="0 0 120 120"><rect x="24" y="52" width="72" height="54" rx="10" fill="rgba(45,212,191,.12)" stroke="#2dd4bf" stroke-width="6"/><path d="M38,52 V38 a22,22 0 0 1 44,0 V52" fill="none" stroke="#2dd4bf" stroke-width="6"/><circle cx="60" cy="78" r="7" fill="#2dd4bf"/></svg>
+    <div><h3>Never decrypts anything</h3><p>headers, timing and cleartext handshake details only</p></div></div>
+  <div class="card glass" id="k2"><svg viewBox="0 0 120 120"><path d="M30,82 a22,22 0 0 1 4,-43 a30,30 0 0 1 56,6 a18,18 0 0 1 0,37 Z" fill="none" stroke="#fbbf24" stroke-width="6"/><line x1="16" y1="104" x2="104" y2="16" stroke="#f43f5e" stroke-width="7"/></svg>
+    <div><h3>Runs fully offline</h3><p>nothing is fetched, nothing is sent</p></div></div>
+  <div class="card glass" id="k3"><svg viewBox="0 0 120 120"><rect x="22" y="14" width="64" height="84" rx="8" fill="rgba(167,139,250,.1)" stroke="#a78bfa" stroke-width="6"/><path d="M36,36 H72 M36,52 H72 M36,68 H58" stroke="#a78bfa" stroke-width="5"/><circle cx="86" cy="88" r="20" fill="#040814" stroke="#34d399" stroke-width="6"/><path d="M77,88 L84,95 L96,81" fill="none" stroke="#34d399" stroke-width="5"/></svg>
+    <div><h3>Signed update bundles</h3><p>anything tampered with is refused before it is loaded</p></div></div>
+</div>
+<script src="../../../dashboard/node_modules/animejs/dist/bundles/anime.umd.min.js"></script>
+<script src="harness.js"></script>
+<script>
+window.build = (tl, cue) => {
+  tl.add('#head', { opacity: [0, 1], translateY: [20, 0], duration: 700 }, cue(0, 0.1));
+  for (let i = 0; i < 4; i++) tl.add(`#k${i}`, { opacity: [0, 1], translateY: [30, 0], duration: 600 }, cue(i + 1, 0.05));
+};
+</script></body></html>

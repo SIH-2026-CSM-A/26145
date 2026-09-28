@@ -6,25 +6,24 @@
   .fig .u { font-size: 32px; color: var(--dim); margin-top: 10px; }
   .fig .d { font-size: 26px; color: var(--fg); margin-top: auto; line-height: 1.35; }
   .fig .s { font-size: 22px; color: var(--faint); margin-top: 12px; }
-  .lane { margin-top: 14px; font-size: 22px; padding: 8px 14px; border-radius: 12px; border: 1px dashed rgba(167,139,250,.55); color: #c4b5fd; opacity: .35; }
+  .lane-unused { margin-top: 14px; font-size: 22px; padding: 8px 14px; border-radius: 12px; border: 1px dashed rgba(167,139,250,.55); color: #c4b5fd; opacity: .35; }
   #src { position: absolute; left: 100px; right: 100px; top: 790px; font-size: 26px; color: var(--dim); opacity: 0; }
 </style></head><body>
-<div id="head"><div class="eyebrow">Measured, not claimed</div><h2>What one laptop core does today</h2></div>
-<div class="fig glass" id="f1" style="left:100px"><div class="v mono" style="color:#5ee6ff">~<span id="n1">0</span></div><div class="u">flows per second</div><div class="d">sustained, end to end: rules, both models, campaigns, hash-chained log</div><div class="s">CTU-13 scenario 12</div></div>
-<div class="fig glass" id="f2" style="left:540px"><div class="v mono" style="color:#5ee6ff">~<span id="n2">0</span></div><div class="u">Mbps</div><div class="d">on the same run</div><div class="s">one core, Python 3.13</div></div>
-<div class="fig glass" id="f3" style="left:980px"><div class="v mono" style="color:#34d399"><span id="n3">0</span> ms</div><div class="u">p99, flow closed → alert out</div><div class="d">at half load, 0 flows dropped</div><div class="lane" id="lane">flow lane today · fast lane (≈1 s) next</div></div>
-<div class="fig glass" id="f4" style="left:1420px"><div class="v mono" style="color:#fbbf24"><span id="n4">0</span> s</div><div class="u">of silence closes a flow</div><div class="d">today's measured behaviour; active flows close at 60 s</div></div>
-<div id="src">Measured 2026-09-27 on an Intel i5-13450HX laptop (WSL2), one core · docs/BENCHMARK.md</div>
+<div id="head"><div class="eyebrow">Measured, not claimed</div><h2>What it does, on real hardware</h2></div>
+<div class="fig glass" id="f1" style="left:100px"><div class="v mono" style="color:#5ee6ff">~<span id="n1">0</span></div><div class="u">flows per second</div><div class="d">one laptop core, end to end</div><div class="s">docs/BENCHMARK.md · CTU-13 scenario 12</div></div>
+<div class="fig glass" id="f2" style="left:540px"><div class="v mono" style="color:#5ee6ff">~<span id="n2">0</span></div><div class="u">Mbps</div><div class="d">on the same run</div><div class="s">docs/BENCHMARK.md · one core, Python 3.13</div></div>
+<div class="fig glass" id="f3" style="left:980px"><div class="v mono" style="color:#34d399">&lt;<span id="n3">0</span>s</div><div class="u">flood / scan → alert</div><div class="d">fast lane, 1× replay, p99 over 20 runs per capture</div><div class="s">docs/BENCHMARK.md · Fast lane</div></div>
+<div class="fig glass" id="f4" style="left:1420px"><div class="v mono" style="color:#fbbf24"><span id="n4">0</span></div><div class="u">same alerts on a GCP Linux VM</div><div class="d">as on the laptop: same capture, same code</div><div class="s">docs/BENCHMARK.md · non-WSL Linux</div></div>
+<div id="src">Laptop: Intel i5-13450HX (WSL2), one core · measured 2026-09-27/28 · docs/BENCHMARK.md</div>
 <script src="../../../dashboard/node_modules/animejs/dist/bundles/anime.umd.min.js"></script>
 <script src="harness.js"></script>
 <script>
 window.build = (tl, cue) => {
   const count = (id, to, at) => { const o = { v: 0 }; tl.add(o, { v: to, duration: 1100, ease: 'outExpo', onUpdate: () => { document.getElementById(id).textContent = Math.round(o.v); } }, at); };
   tl.add('#f1', { opacity: [0, 1], translateY: [30, 0], duration: 600 }, cue(0, 0.1)); count('n1', 860, cue(0, 0.3));
-  tl.add('#f2', { opacity: [0, 1], translateY: [30, 0], duration: 600 }, cue(0, 4.2)); count('n2', 223, cue(0, 4.4));
-  tl.add('#src', { opacity: [0, 1], duration: 600 }, cue(0, 6.0));
-  tl.add('#f3', { opacity: [0, 1], translateY: [30, 0], duration: 600 }, cue(1, 0.1)); count('n3', 250, cue(1, 0.3));
-  tl.add('#f4', { opacity: [0, 1], translateY: [30, 0], duration: 600 }, cue(2, 0.1)); count('n4', 15, cue(2, 0.3));
-  tl.add('#lane', { opacity: [0.35, 1], scale: [1, 1.04, 1], duration: 900 }, cue(3, 0.4));
+  tl.add('#f2', { opacity: [0, 1], translateY: [30, 0], duration: 600 }, cue(1, 0.1)); count('n2', 223, cue(1, 0.3));
+  tl.add('#src', { opacity: [0, 1], duration: 600 }, cue(1, 1.5));
+  tl.add('#f3', { opacity: [0, 1], translateY: [30, 0], duration: 600 }, cue(2, 0.1)); count('n3', 2, cue(2, 0.3));
+  tl.add('#f4', { opacity: [0, 1], translateY: [30, 0], duration: 600 }, cue(3, 0.1)); count('n4', 91, cue(3, 0.3));
 };
 </script></body></html>

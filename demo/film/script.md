@@ -1,128 +1,134 @@
-# SAAKSHI film: narration script
+# SAAKSHI film v2: narration script
 
-Target 3:00–3:30 at ~140 words per minute. Every line says only what is true and what is on screen
-at that moment. Numbers come from the running demo or from docs/BENCHMARK.md, docs/MODELS.md and
-docs/RULES.md. One WAV per sentence (subtitle timing); each beat's video lasts as long as its audio.
+Target 4:30–5:30. Every line says only what is true and what is on screen at that moment. Numbers
+come from the running demo or docs/BENCHMARK.md. One WAV per "> " line (one subtitle unit); each
+segment's video lasts as long as its audio. v1: script-v1.md.
 
-Pronunciation (Kokoro phoneme overrides): SAAKSHI = "SAAK-shee", NTRO = "N-T-R-O",
-JA4 = "J-A-four", DGA = "D-G-A", C2 = "C-two", SHA-256 = "shah two-fifty-six",
-F.R.I.E.N.D.S = "Friends".
+Rules for v2: nothing about work that is not built; no model card, no "28%", no "false positive";
+the university hosts' C2 campaigns may be visible on the map, but the narration does not point at
+them.
+
+Pronunciation (Kokoro phoneme overrides in tts.py): SAAKSHI, NTRO, SYN, Bharatiya Sakshya
+Adhiniyam, F.R.I.E.N.D.S = "Friends".
+
+Changes from the owner's draft, each to keep a line true:
+- beat 3: "a log that cannot be changed without it showing" → "a hash-chained log, so an edited
+  record breaks the chain" (a full rebuild of the chain is caught only against an exported head);
+- beat 4: "within about a second" → "within two seconds" (fast lane p50 1.5 s, p99 2.0 s on the
+  generated SYN flood, docs/BENCHMARK.md);
+- beat 7: "headers and timing only" → "headers, timing and cleartext handshake details only" (the
+  DNS and TLS rules read query names and ClientHello fields);
+- beat 8: "about two hundred and twenty megabits" → "two hundred and twenty-three" (the screen
+  shows ~223 Mbps);
+- beat 9: "a record that proves it was not changed" → "a record where an edited alert breaks the
+  chain".
 
 ---
 
-## 1. Hook (0:00–0:25) · title scene (HTML, anime.js)
-**Screen:** dark field; a link line draws left to right through a diode gate; the return direction
-appears dashed with a lock. Then the six threat classes appear as chips in their colours.
+## 1. The problem · new scene (problem.html)
+**Screen:** three critical networks, the diode, a one-way arrow, the monitor on the far side; then
+what most tools assume, struck through; then the question and the name.
 
-> Critical networks watch their links through a one-way data diode.
-> The monitor can see everything on the link, but it can never send a single byte back.
-> SAAKSHI is our answer to NTRO's problem statement: find threats in that one-way traffic.
-> Six of them: floods, command-and-control beacons, random domains and DNS tunnels,
-> malware hidden inside encrypted sessions, scanning, and data leaving the network.
+> Some networks must never leak: defence systems, power grids, telecom cores.
+> Links like these are often guarded by a data diode, a device that lets traffic flow in one direction only.
+> Hardware, not software, stops anything from going back.
+> That keeps the network safe. But it also means the security monitor sits on the far side.
+> It only sees a copy of the traffic. It can never ask a question, never send a probe, never block anything.
+> Most security tools were built for two-way links.
+> They expect to see every reply, they often read the content, and they assume they can check things online.
+> On a one-way link, replies can be missing, most traffic is encrypted, and there is no internet.
+> NTRO's problem statement asks: can AI find cyber threats in this one-way traffic alone?
+> SAAKSHI, the Hindi word for witness, is our answer.
+> It watches, it never talks back, and every alert comes with its evidence.
 
-(76 words · ~31 s)
+## 2. Six threats in plain words · new scene (threats.html)
+**Screen:** six cards in the class colours, each with a small animation, appearing as named.
 
-## 2. Architecture (0:25–0:55) · animated diagram (HTML, anime.js)
-**Screen:** the chain lights up box by box: tap and diode → capture → flows → feature store →
-rules and model → alerts → campaigns → hash-chained log → dashboard. The contract line appears
-under the feature store.
+> The problem statement names six threats.
+> Floods: a server buried under fake traffic.
+> Command and control: an infected machine quietly checking in with its attacker, like clockwork.
+> Random-looking domain names, and data smuggled out inside DNS lookups.
+> Malware hiding inside encrypted connections.
+> Scanning: an attacker knocking on every door to find one that is open.
+> And exfiltration: data being stolen out of the network.
 
+## 3. How SAAKSHI works · the v1 architecture scene, with the fast lane (arch.html)
 > Packets arrive through a passive tap and the diode.
-> We rebuild them into flows, and a feature store keeps rolling counts per host, per server and per pair.
-> Rules and a trained model score every flow.
-> Alerts that share a rare host, server, name or fingerprint are grouped into campaigns,
-> and every alert is written to a log chained with SHA-256.
-> One rule holds it together: each feature declares what the link must show for it.
-> If a flow's reply was never captured, a feature that needs the reply is not guessed.
-> The detector switches to a declared substitute.
+> We rebuild them into conversations, called flows, and keep rolling counts for every host and server.
+> Floods and scans are also counted packet by packet, every second, so they are caught while they are still happening.
+> Rules and a trained AI model score every flow.
+> Alerts that point to the same unusual host, server or name are grouped into one campaign,
+> so an analyst reads one story instead of ten scattered alarms.
+> And every alert is written to a hash-chained log, so an edited record breaks the chain.
+> One rule holds it all together: if the link did not show us something, we never pretend we saw it.
+> Each alert says what it could see and what it could not.
 
-(89 words · ~38 s)
+## 4. Live replay · the real pipeline, `serve demo/demo.pcap --speed 5`
+**Screen:** the dashboard, live. Every cut in the recording carries a "time skip" card.
 
-## 3. Live replay (0:55–2:00) · the real pipeline, `serve demo/demo.pcap --speed 5`
-**Screen:** the dashboard, live. "⏩ time skip +Ns" cards mark every cut; there is no speed ramp.
-
-*3a, quiet link:* hero with steady dots, KPI strip.
-> This is the real pipeline, replaying a committed capture at five times real time:
-> real university traffic, plus generated attack packets.
+*quiet*
+> This is the real pipeline, replaying a recorded capture at five times real time:
+> real university traffic, plus attack traffic we generated.
 > Each dot is about five flows. Nothing crosses back.
 
-*3b, scan:* the spark flies to tile (e), which pulses.
-> Host one-nine-two dot one-six-eight dot one dot six-six scans ports on one internal server.
+*scan*
+> Host one-nine-two dot one-six-eight dot one dot six-six scans ports on an internal server.
 > That alert opens a campaign.
 
-*3c, the chain:* sparks land on (d), (b), (c) and (f), one after another; the ribbon card for the
-host gains a colour each time.
-> Then the same host shows a rare TLS client, regular check-ins to an outside server,
+*chain*
+> Then the same host shows a rare encrypted client, regular check-ins to an outside server,
 > lookups of random-looking names, data hidden in DNS, and a large upload.
-> Each one shares a rare pivot with the campaign, so all six join it.
+> Each one shares something rare with the campaign, so they all join it.
 
-*3d, flood:* the red spark lands on tile (a); a fourth campaign card appears.
-> A SYN flood on another server shares no rare pivot with them. It gets its own campaign.
+*flood:* tile (a) shows the outlined provisional alert, then (after a time-skip card) the
+confirming alert, solid.
+> A SYN flood hits another server.
+> The fast lane flags it within two seconds, outlined,
+> and it turns solid when the full check confirms it.
+> It gets its own campaign.
 
-*3e, map and timeline:* scroll to the map; click 192.168.1.66; the swim lanes animate.
-> The map shows each campaign. The host's timeline lists what was seen, in order:
-> discovery, then command and control, then exfiltration.
-> It is history. It does not predict the next step.
+*map:* scroll to the map; click 192.168.1.66; the stage timeline.
+> The map shows each campaign.
+> The host's timeline lists what happened, in order: discovery, then command and control, then data theft.
+> It is a record of what was seen, not a guess about what comes next.
 
-(143 words · ~61 s)
+## 5. Case file · click the upload line, then Verify
+> Open the upload alert.
+> This host sent two hundred and eighty bytes out for every byte that came back. The rule's line is fifty.
+> The alert also shows what this link could see. Here both directions were captured.
+> If the replies had been missing, SAAKSHI would switch to a different, declared signal, and say so on the alert.
+> Verify checks the whole log again, on the spot. Every record checks out.
 
-## 4. Case file (2:00–2:30) · click the exfiltration line
-**Screen:** the case file slides in; the evidence bar fills past its threshold tick; the
-request/reply diagram; "Verify chain" pressed, ticks run across the blocks.
+## 6. Tamper test · the verify-log terminal (tamper.html, real transcript)
+> In an inquiry, the first question is: has anyone changed the record?
+> Change one byte of alert three in the database, and the check fails,
+> and names the exact record: broken at index three.
+> Each export carries a data sheet to support a certificate
+> under Section sixty-three of the Bharatiya Sakshya Adhiniyam.
 
-> The upload sent two hundred and eighty bytes out for every byte that came back.
-> The rule's threshold is fifty.
-> This link carried both directions, so that ratio could be computed.
-> Without the reply, the contract would switch to an egress spike and a rare destination.
-> Verify recomputes the hash chain on the server. All ten records check out.
+## 7. Safe by design · new card (safe.html)
+> SAAKSHI is built for places where trust matters.
+> The AI model can never raise a high alert on its own. A rule must see the evidence too.
+> It reads headers, timing and cleartext handshake details only, and never decrypts anything.
+> It runs fully offline.
+> Model and rule updates arrive as signed bundles, and anything tampered with is refused before it is loaded.
 
-(64 words · ~27 s)
+## 8. Numbers · the numbers card, updated (numbers.html)
+**Screen:** ~860 flows/s · ~223 Mbps · flood/scan alert < 2 s (fast lane, 1× replay, p99) · same 91
+alerts on a GCP Linux VM; a source line under each (docs/BENCHMARK.md).
 
-## 5. Tamper test (2:30–2:45) · the verify-log terminal
-**Screen:** `verify-log` prints "verified: 10 records"; the one-byte edit runs; `verify-log`
-prints "BROKEN at index 3 of 10" in red.
+> On one laptop core, SAAKSHI handles about eight hundred and sixty flows a second,
+> about two hundred and twenty-three megabits per second.
+> Floods and scans are flagged in under two seconds.
+> The same pipeline gives the same detections on a cloud Linux server.
 
-> Now change one byte of alert three in the database.
-> The check fails, and names the record: broken at index three.
-> It catches edits made without rebuilding the whole chain.
-> Signed checkpoints, which stop that too, are the next step we are building.
+## 9. Why it matters · new card (why.html)
+> For the analyst: one campaign to read, with its evidence, instead of a pile of alarms.
+> For NTRO: detection that works with the diode, not against it.
+> For an inquiry: a record where an edited alert breaks the chain.
 
-(23 words · ~10 s)
+## 10. End card (end.html)
+**Screen:** SAAKSHI · The silent witness · SIH26145 · Team F.R.I.E.N.D.S · the repository, and the
+live demo address (screen only).
 
-## 6. Honesty (2:45–3:10) · model card, then the three university C2 alerts on the map
-**Screen:** model card, "Held-out result" highlighted; then the two university campaigns on the map.
-
-> The model card says what the model cannot do.
-> On scenarios it never saw, it catches only twenty-eight percent of malicious flows at its alert budget,
-> so model-only alerts are capped at medium.
-> And these three C2 alerts on real university hosts are false positives.
-> We show them as they are.
-
-(50 words · ~21 s)
-
-## 7. Numbers (3:10–3:25) · a numbers card in the dashboard style
-**Screen:** four figures, each with its source: ~860 flows/s · ~223 Mbps · one laptop core
-(docs/BENCHMARK.md); p99 250 ms flush → alert at half load; flows close after 15 s idle; under the latency figure, small:
-"flow lane today · fast lane (≈1 s) next".
-
-> On one laptop core, SAAKSHI scores about eight hundred and sixty flows a second, about two hundred and twenty megabits per second.
-> At half load, ninety-nine percent of alerts are out within a quarter of a second of a flow closing.
-> A flow closes after fifteen seconds of silence.
-> Alerting on floods and scans within a second, before a flow closes, is being built now; the fifteen seconds is today's measured behaviour.
-
-(46 words · ~20 s)
-
-## 8. End card (3:25–3:32)
-**Screen:** SAAKSHI · SIH26145 · Team F.R.I.E.N.D.S · github.com/SIH-2026-CSM-A/26145, and under it
-"Live demo: 8.234.101.133.sslip.io" (screen only, not narrated)
-
-> SAAKSHI. SIH twenty-six one forty-five, team Friends.
-
-(8 words · ~4 s)
-
----
-
-**Total:** ~499 words, ~3:32 at 140 wpm (Kokoro's pace is usually a little faster; the final
-length is set by the audio). Owner rule: if the total runs over 3:40, cut the middle sentence of 3e
-first, then "Each dot is about five flows" in 3a. Beats 5, 6 and 7 are never cut.
-Voice: Kokoro af_heart at 0.9 speed (owner's pick).
+> SAAKSHI. The silent witness. SIH twenty-six one forty-five, team Friends.

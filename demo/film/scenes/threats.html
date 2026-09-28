@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+  #head { position: absolute; top: 56px; left: 100px; opacity: 0; } #head h2 { font-size: 56px; font-weight: 600; margin-top: 8px; }
+  #grid { position: absolute; left: 100px; right: 100px; top: 230px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: 380px 380px; gap: 32px; }
+  .card { position: relative; padding: 26px 30px; opacity: 0; overflow: hidden; }
+  .card .bar { position: absolute; left: 0; right: 0; top: 0; height: 5px; }
+  .card .k { font-size: 26px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .card h3 { font-size: 38px; white-space: nowrap; font-weight: 600; margin-top: 4px; }
+  .card p { font-size: 28px; color: var(--dim); margin-top: 8px; line-height: 1.3; }
+  .card svg { position: absolute; left: 30px; right: 30px; bottom: 22px; width: calc(100% - 60px); height: 150px; }
+</style></head><body>
+<div id="head"><div class="eyebrow">What the problem statement asks for</div><h2>Six threats</h2></div>
+<div id="grid">
+  <div class="card glass" id="c0"><div class="bar" style="background:var(--ddos)"></div><div class="k" style="color:var(--ddos)">(a)</div><h3>Floods</h3><p>a server buried under fake traffic</p><svg viewBox="0 0 500 150" id="s0"><rect x="400" y="30" width="70" height="95" rx="8" fill="none" stroke="#f43f5e" stroke-width="4"/><g id="g0"></g></svg></div>
+  <div class="card glass" id="c1"><div class="bar" style="background:var(--c2)"></div><div class="k" style="color:var(--c2)">(b)</div><h3>Command and control</h3><p>checking in with the attacker, like clockwork</p><svg viewBox="0 0 500 150"><circle cx="50" cy="75" r="26" fill="none" stroke="#a78bfa" stroke-width="4"/><circle cx="450" cy="75" r="26" fill="none" stroke="#a78bfa" stroke-width="4" stroke-dasharray="6 6"/><line x1="80" y1="75" x2="420" y2="75" stroke="rgba(167,139,250,.3)" stroke-width="3"/><circle id="b1" r="10" cy="75" fill="#a78bfa"/><text id="t1" x="250" y="135" text-anchor="middle" font-size="24" fill="#9aa8c0" class="mono">regular interval</text></svg></div>
+  <div class="card glass" id="c2"><div class="bar" style="background:var(--dga)"></div><div class="k" style="color:var(--dga)">(c)</div><h3>Random names, tunnels</h3><p>odd domains; data hidden in DNS</p><svg viewBox="0 0 500 150"><defs><clipPath id="cl2"><rect x="0" y="0" width="500" height="150"/></clipPath></defs><g id="g2" class="mono" font-size="26" clip-path="url(#cl2)"></g></svg></div>
+  <div class="card glass" id="c3"><div class="bar" style="background:var(--tls)"></div><div class="k" style="color:var(--tls)">(d)</div><h3>Malware in encryption</h3><p>hiding where content can't be read</p><svg viewBox="0 0 500 150"><rect x="30" y="50" width="440" height="50" rx="25" fill="rgba(45,212,191,.08)" stroke="#2dd4bf" stroke-width="3"/><g transform="translate(236,14)"><rect x="0" y="16" width="28" height="22" rx="4" fill="#2dd4bf"/><path d="M5,16 V10 a9,9 0 0 1 18,0 V16" fill="none" stroke="#2dd4bf" stroke-width="4"/></g><g id="g3"></g></svg></div>
+  <div class="card glass" id="c4"><div class="bar" style="background:var(--scan)"></div><div class="k" style="color:var(--scan)">(e)</div><h3>Scanning</h3><p>knocking on every door</p><svg viewBox="0 0 500 150"><g id="g4"></g></svg></div>
+  <div class="card glass" id="c5"><div class="bar" style="background:var(--exf)"></div><div class="k" style="color:var(--exf)">(f)</div><h3>Exfiltration</h3><p>data stolen out of the network</p><svg viewBox="0 0 500 150"><rect x="20" y="15" width="230" height="120" rx="14" fill="none" stroke="rgba(244,114,182,.5)" stroke-width="3"/><text x="36" y="42" font-size="20" fill="#68768f">network</text><g id="f5"><rect x="-22" y="-28" width="44" height="56" rx="5" fill="rgba(244,114,182,.2)" stroke="#f472b6" stroke-width="3"/><path d="M-12,-10 H12 M-12,0 H12 M-12,10 H6" stroke="#f472b6" stroke-width="3"/></g></svg></div>
+</div>
+<script src="../../../dashboard/node_modules/animejs/dist/bundles/anime.umd.min.js"></script>
+<script src="harness.js"></script>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); parent.appendChild(e); return e; };
+let s = 7; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+const flood = Array.from({ length: 40 }, () => ({ e: el('circle', { r: 5, fill: '#f43f5e' }, document.getElementById('g0')), y: 35 + rnd() * 85, ph: rnd(), v: 0.8 + rnd() * 0.6 }));
+const names = ['xkqvbzt.com', 'rtzkkpwq.net', 'a3f9e1.t.tunnel.org', 'mqzvlkd.com', '7c2b0d.t.tunnel.org', 'pwqzxjr.info'];
+const lines = names.map((n, i) => el('text', { x: 20, fill: i % 2 ? '#fb923c' : '#fbbf24' }, document.getElementById('g2')));
+lines.forEach((t, i) => { t.textContent = names[i]; });
+const bug = el('circle', { r: 9, cy: 75, fill: '#f43f5e' }, document.getElementById('g3'));
+const doors = Array.from({ length: 10 }, (_, i) => el('rect', { x: 18 + i * 47, y: 45, width: 34, height: 60, rx: 4, fill: 'none', stroke: '#38bdf8', 'stroke-width': 3 }, document.getElementById('g4')));
+const knock = el('circle', { r: 8, cy: 125, fill: '#38bdf8' }, document.getElementById('g4'));
+const file = document.getElementById('f5');
+const start = [];
+window.build = (tl, cue) => {
+  tl.add('#head', { opacity: [0, 1], translateY: [20, 0], duration: 700 }, cue(0, 0.1));
+  for (let i = 0; i < 6; i++) {
+    tl.add(`#c${i}`, { opacity: [0, 1], translateY: [30, 0], duration: 600 }, cue(i + 1, 0.05));
+    start[i] = cue(i + 1, 0.05) / 1000;
+  }
+};
+window.frame = (t) => {
+  const local = (i) => Math.max(0, t - (start[i] ?? 1e9));
+  const a = local(0);
+  flood.forEach((d) => { const u = ((a * d.v * 0.9) + d.ph) % 1; d.e.setAttribute('cx', 10 + u * 385); d.e.setAttribute('cy', d.y); d.e.setAttribute('opacity', a > 0 ? 0.9 : 0); });
+  const b = local(1), u = (b % 1.5) / 1.5; // one check-in every 1.5 s on screen
+  document.getElementById('b1').setAttribute('cx', 80 + Math.min(1, u * 1.6) * 340);
+  document.getElementById('b1').setAttribute('opacity', b > 0 && u < 0.7 ? 1 : 0);
+  const c = local(2);
+  lines.forEach((ln, i) => { const y = 150 - ((c * 38 + i * 32) % 190); ln.setAttribute('y', y); ln.setAttribute('opacity', c > 0 ? Math.max(0, Math.min(1, y / 40, (150 - y) / 30)) : 0); });
+  const d = local(3); bug.setAttribute('cx', 60 + ((d * 120) % 380)); bug.setAttribute('opacity', d > 0 ? 0.5 + 0.5 * Math.sin(d * 6) : 0);
+  const e = local(4), k = Math.floor(e * 4) % 12;
+  doors.forEach((r, i) => { const open = i === 7 && e > 7 / 4; r.setAttribute('fill', open ? 'rgba(52,211,153,.35)' : (i === k ? 'rgba(56,189,248,.25)' : 'none')); r.setAttribute('stroke', open ? '#34d399' : '#38bdf8'); });
+  knock.setAttribute('cx', 35 + Math.min(k, 9) * 47); knock.setAttribute('opacity', e > 0 && k < 10 ? 1 : 0);
+  const f = local(5), v = (f % 2.4) / 2.4;
+  file.setAttribute('transform', `translate(${110 + v * 340},75)`); file.setAttribute('opacity', f > 0 ? Math.min(1, (1 - v) * 4) : 0);
+};
+</script></body></html>

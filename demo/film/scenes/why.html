@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+  #head { position: absolute; top: 64px; left: 100px; } #head h2 { font-size: 56px; font-weight: 600; margin-top: 8px; }
+  #row { position: absolute; left: 100px; right: 100px; top: 280px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px; }
+  .p { height: 560px; padding: 44px 40px; opacity: 0; display: flex; flex-direction: column; }
+  .p svg { width: 110px; height: 110px; }
+  .p .w { font-size: 30px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; margin-top: 36px; }
+  .p h3 { font-size: 44px; font-weight: 600; line-height: 1.2; margin-top: 16px; }
+</style></head><body>
+<div id="head"><div class="eyebrow">Why it matters</div><h2>Three people, three answers</h2></div>
+<div id="row">
+  <div class="p glass" id="p0"><svg viewBox="0 0 110 110"><circle cx="55" cy="36" r="20" fill="none" stroke="#5ee6ff" stroke-width="6"/><path d="M18,100 C22,72 88,72 92,100" fill="none" stroke="#5ee6ff" stroke-width="6"/></svg>
+    <div class="w" style="color:#5ee6ff">The analyst</div><h3>one campaign to read, with its evidence, instead of a pile of alarms</h3></div>
+  <div class="p glass" id="p1"><svg viewBox="0 0 110 110"><rect x="40" y="10" width="8" height="90" rx="3" fill="#34d399"/><rect x="62" y="10" width="8" height="90" rx="3" fill="#34d399"/><path d="M10,55 H96" stroke="#34d399" stroke-width="6"/><path d="M84,43 L98,55 L84,67" fill="none" stroke="#34d399" stroke-width="6"/></svg>
+    <div class="w" style="color:#34d399">NTRO</div><h3>detection that works with the diode, not against it</h3></div>
+  <div class="p glass" id="p2"><svg viewBox="0 0 110 110"><rect x="18" y="8" width="66" height="90" rx="8" fill="none" stroke="#fbbf24" stroke-width="6"/><path d="M32,32 H70 M32,48 H70 M32,64 H54" stroke="#fbbf24" stroke-width="5"/><path d="M66,82 L80,70 M72,96 L98,70" stroke="#fbbf24" stroke-width="6"/></svg>
+    <div class="w" style="color:#fbbf24">An inquiry</div><h3>a record where an edited alert breaks the chain</h3></div>
+</div>
+<script src="../../../dashboard/node_modules/animejs/dist/bundles/anime.umd.min.js"></script>
+<script src="harness.js"></script>
+<script>
+window.build = (tl, cue) => { for (let i = 0; i < 3; i++) tl.add(`#p${i}`, { opacity: [0, 1], translateY: [30, 0], duration: 700 }, cue(i, 0.05)); };
+</script></body></html>

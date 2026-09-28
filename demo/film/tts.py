@@ -29,6 +29,9 @@ LEXICON = {
     "C2": "[C2](/sˌiˈtu/)",
     "SHA-256": "[SHA-256](/ʃˈɑ tˈu fˈɪfti sˈɪks/)",
     "SYN": "[SYN](/sˈɪn/)",
+    "Bharatiya": "[Bharatiya](/bˈɑɹətˌijə/)",
+    "Sakshya": "[Sakshya](/sˈɑkʃjə/)",
+    "Adhiniyam": "[Adhiniyam](/ʌdˈɪnijəm/)",
 }
 
 
