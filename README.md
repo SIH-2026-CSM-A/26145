@@ -49,7 +49,7 @@ What happens:
 ## 🔒 Passive Tap & Data-Diode Architecture
 
 The system operates strictly under **PASSIVE READ-ONLY MONITORING** semantics:
-- **No Transmit Sockets**: the sensor reads capture files (pcap/pcapng) and opens no network socket during a replay; a static scan and a runtime audit-hook test enforce it. How "nothing goes back" is enforced, and what is only a deployment requirement: [`docs/ISOLATION.md`](docs/ISOLATION.md).
+- **No Transmit Sockets**: the sensor reads capture files (pcap/pcapng) and opens no network socket during a replay; a static scan and a runtime audit-hook test enforce it. How "nothing goes back" is enforced, and what is only a deployment requirement: [`docs/ISOLATION.md`](docs/ISOLATION.md). What still fires when the capture holds one direction only (IN or OUT), per threat class, with the false alarms it raised: [`docs/ONEWAY.md`](docs/ONEWAY.md).
 - **No Active Mitigation**: Zero TCP RST generation, IP blocking, or firewall rule modification.
 - **No Payload Decryption**: Operates 100% on observable packet headers, flow metadata, timing, and protocol fields.
 
