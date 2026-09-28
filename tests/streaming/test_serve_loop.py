@@ -22,16 +22,17 @@ async def test_loop_resets_store_and_notifies(tmp_path):
     task = asyncio.create_task(serve(pcap, None, port=0, loop=True, pause=2.0))
     try:
         events = []
-        while [e for e, _ in events][:3] != ["alert", "reset", "alert"] and len(events) < 3:
+        while len(events) < 5:
             events.append(await asyncio.wait_for(q.get(), timeout=30))
-        await asyncio.sleep(0.5)  # loop 2 finishes its (one-alert) replay, then pauses 2 s
+        await asyncio.sleep(0.5)  # loop 2 finishes its (two-alert) replay, then pauses 2 s
         kinds = [e for e, _ in events]
-        # loop 1: one alert; reset; loop 2: the same alert again, into a fresh store
-        assert kinds[:3] == ["alert", "reset", "alert"], kinds
-        assert events[1][1] == {"loop": 2}
+        # loop 1: the fast-lane alert and the flow-lane alert confirming it; reset; loop 2: the
+        # same two again, into a fresh store
+        assert kinds[:5] == ["alert", "alert", "reset", "alert", "alert"], kinds
+        assert events[2][1] == {"loop": 2}
         assert api.source["loop"] >= 2 and api.source["capture"] == "scan.pcap"
         res = await api.storage.verify_chain()
-        assert res["ok"] and res["n"] == 1  # this loop's chain only
+        assert res["ok"] and res["n"] == 2  # this loop's chain only
     finally:
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)

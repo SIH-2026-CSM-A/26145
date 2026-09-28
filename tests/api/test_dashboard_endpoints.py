@@ -38,6 +38,11 @@ def test_class_stats_count_the_whole_log(client):
     row = client.get("/api/v1/stats/classes").json()["classes"]["THREAT_TEST_STATS"]
     assert row["count"] == before + 3 and row["last_seen"]
     assert len(set(ids)) == 3
+    fast = _alert("THREAT_TEST_STATS")
+    fast.provisional = True
+    client.portal.call(publish_alert, fast)
+    row = client.get("/api/v1/stats/classes").json()["classes"]["THREAT_TEST_STATS"]
+    assert row["count"] == before + 3 and row["provisional"] >= 1  # fast-lane alerts are counted apart
 
 
 def test_chain_blocks_are_the_neighbouring_links(client):

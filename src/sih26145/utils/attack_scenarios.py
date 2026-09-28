@@ -58,6 +58,14 @@ def syn_flood(t0: float = T0) -> Packets:
     return out
 
 
+def spoofed_flood(t0: float = T0) -> Packets:
+    """hping3 --rand-source style: one machine sends 5,000 SYNs in 1 s to one web server, each
+    from a new random public address and port. One sender, so every packet has the same TTL."""
+    rng, victim = random.Random(10), "10.50.0.11"
+    return [(t0 + i / 5000, pkt(_public_ip(rng), victim, rng.randrange(1024, 65536), 80, "TCP", b"", SYN))
+            for i in range(5000)]
+
+
 def udp_reflection(t0: float = T0) -> Packets:
     """200 open DNS/NTP/memcached reflectors send ~8 MB of unsolicited large responses to one
     internal host in 10 s (the attacker spoofed the victim's address in its requests)."""
@@ -147,6 +155,7 @@ def exfil_upload(t0: float = T0) -> Packets:
 
 ATTACK_SCENARIOS: Dict[str, Callable[..., Packets]] = {
     "syn_flood": syn_flood,
+    "spoofed_flood": spoofed_flood,
     "udp_reflection": udp_reflection,
     "single_source_flood": single_source_flood,
     "c2_beacon": c2_beacon,

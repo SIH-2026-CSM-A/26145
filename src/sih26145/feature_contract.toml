@@ -9,13 +9,14 @@
 # Layer 2 (runtime): FlowRecord.observability_state per flow — see docs/ARCHITECTURE.md §5-6.
 #
 # Columns: tier = flow | host | dst | pair | global | link
-#          approx = exact | hll | cms | bucketed | ewma   (estimation error, separate from state)
+#          approx = exact | hll | cms | bucketed | ewma | capped   (estimation error, separate from state;
+#                   capped = exact up to a stated cap, then saturates)
 #          sources = ingest adapters that yield it (dpkt, zeek)
 # Consumers (detectors, models) declare max_state and the exact features they read;
 # tests/contract/ checks their source code against these declarations.
 # Changing a row or a consumer's reads = bump contract_version.
 
-contract_version = "1.3.0"
+contract_version = "1.4.0"
 
 features = [
   # ---- Tier 1: per-flow FeatureVector ------------------------------------------------------
@@ -98,6 +99,22 @@ features = [
   { name = "ja4_prevalence",            state = "degraded",   tier = "global", approx = "cms",    sources = ["dpkt", "zeek"], reason = "How often this JA4 has been seen enclave-wide (Count-Min, halves daily). Client half only." },
   { name = "link_reverse_visibility_w", state = "computable", tier = "link", approx = "exact",    sources = ["dpkt", "zeek"], reason = "Fraction of flows in the window with reverse_seen: the link's measured visibility." },
 
+  # ---- Fast lane: 1-s packet counters before flow assembly (detectors/fastlane.py) ----------
+  # Tables are opened by a SYN (no ACK) or by UDP from a reflector port; counts saturate at 4,096.
+  { name = "fl_dst_packets_1s",        state = "computable", tier = "dst",  approx = "exact",  sources = ["dpkt"], reason = "Packets toward a destination in the 1-s window, counted once a SYN or reflector-port UDP packet has opened its table in that window." },
+  { name = "fl_dst_syns_1s",           state = "computable", tier = "dst",  approx = "exact",  sources = ["dpkt"], reason = "TCP packets with SYN and without ACK toward the destination in the window." },
+  { name = "fl_dst_syn_srcs_1s",       state = "computable", tier = "dst",  approx = "capped", sources = ["dpkt"], reason = "Distinct sources that sent SYNs toward the destination in the window (exact, saturates at 4,096)." },
+  { name = "fl_dst_syn_only_share_1s", state = "degraded",   tier = "dst",  approx = "capped", sources = ["dpkt"], reason = "Share of those SYN sources that sent no ACK-bearing packet to the destination in the same window. Uses the initiator half only; a handshake split across a window boundary counts as unanswered." },
+  { name = "fl_dst_src_entropy_1s",    state = "computable", tier = "dst",  approx = "capped", sources = ["dpkt"], reason = "Shannon entropy (bits) of SYN counts per source toward the destination in the window." },
+  { name = "fl_dst_ttl_spread_1s",     state = "computable", tier = "dst",  approx = "exact",  sources = ["dpkt"], reason = "Max minus min IP TTL of the SYNs toward the destination in the window. Near 0 from many sources suggests one sender spoofing them; evidence only." },
+  { name = "fl_dst_refl_srcs_1s",      state = "degraded",   tier = "dst",  approx = "capped", sources = ["dpkt"], reason = "Distinct reflector-port sources (53, 123, 1900, 11211, 389, 19, 161, 111) sending UDP to the destination that it did not query in this or the previous second. Needs the destination's own half to prove a query; on an inbound-only capture genuine answers are counted too." },
+  { name = "fl_dst_refl_bytes_1s",     state = "degraded",   tier = "dst",  approx = "capped", sources = ["dpkt"], reason = "Wire bytes from those unsolicited reflectors in the window; same capture caveat." },
+  { name = "fl_dst_refl_mean_pkt_1s",  state = "degraded",   tier = "dst",  approx = "capped", sources = ["dpkt"], reason = "Mean packet size from those reflectors (amplified answers are large); null when there are none." },
+  { name = "fl_src_syn_targets_1s",    state = "computable", tier = "host", approx = "capped", sources = ["dpkt"], reason = "Distinct (destination, port) targets this source sent SYNs to in the window." },
+  { name = "fl_src_syn_only_share_1s", state = "degraded",   tier = "host", approx = "capped", sources = ["dpkt"], reason = "Share of those targets this source never sent an ACK-bearing packet to in the window. Initiator half only." },
+  { name = "fl_src_distinct_dsts_1s",  state = "computable", tier = "host", approx = "capped", sources = ["dpkt"], reason = "Distinct destination hosts among this source's SYN targets in the window." },
+  { name = "fl_src_distinct_ports_1s", state = "computable", tier = "host", approx = "capped", sources = ["dpkt"], reason = "Distinct destination ports among this source's SYN targets in the window." },
+
   # ---- Reverse-dependent: computed only when the needed half was observed on this flow --------
   { name = "outbound_inbound_byte_ratio", state = "reverse_dependent", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "Needs bytes in both directions. Never estimated when the inbound half is missing.", substitutes = ["src_egress_bytes_z", "dst_distinct_srcs_longterm", "off_hours"] },
   { name = "tcp_handshake_completed", state = "reverse_dependent", tier = "flow", approx = "exact", sources = ["dpkt", "zeek"], reason = "SYN in one direction and SYN-ACK in the other." },
@@ -162,6 +179,15 @@ ps_class = "f"
 max_state = "reverse_dependent"
 reads = ["egress_bytes", "outbound_inbound_byte_ratio", "src_egress_bytes_z", "dst_distinct_srcs_longterm", "off_hours"]
 tuning = "Ruleset 2.1.0 (docs/RULES.md): MIN_RATIO 10 -> 50, MAX_DST_SOURCES 2 -> 1."
+
+[consumers.fastlane_detector]
+ps_class = "a,e"
+max_state = "degraded"
+reads = ["fl_dst_packets_1s", "fl_dst_syns_1s", "fl_dst_syn_srcs_1s", "fl_dst_syn_only_share_1s",
+         "fl_dst_src_entropy_1s", "fl_dst_ttl_spread_1s", "fl_dst_refl_srcs_1s", "fl_dst_refl_bytes_1s",
+         "fl_dst_refl_mean_pkt_1s", "fl_src_syn_targets_1s", "fl_src_syn_only_share_1s",
+         "fl_src_distinct_dsts_1s", "fl_src_distinct_ports_1s"]
+weakness = "Provisional only: one-second windows see floods and scans faster than 50 SYN sources, 20 reflectors or 20 SYN targets per second. Slower ones are left to the flow lane. No shared-infrastructure suppression: a fast sweep of a popular server is flagged and stays unconfirmed."
 
 [consumers.ml_flow_models]
 ps_class = "all"

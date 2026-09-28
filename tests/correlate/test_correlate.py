@@ -108,7 +108,10 @@ async def test_one_host_recon_c2_exfil_is_one_campaign_with_three_stages(tmp_pat
     try:
         classes = {a.threat_class for a in alerts}
         assert {"THREAT_RECON_PORTSCAN", "THREAT_C2_BEACON", "THREAT_EXFILTRATION"} <= classes
-        assert len({a.campaign_id for a in alerts}) == 1, [(a.threat_class, a.campaign_id) for a in alerts]
+        # provisional (fast-lane) alerts are not correlated; the flow-lane alert that confirms one is
+        assert all(a.campaign_id is None for a in alerts if a.provisional)
+        flow_lane = [a for a in alerts if not a.provisional]
+        assert len({a.campaign_id for a in flow_lane}) == 1, [(a.threat_class, a.campaign_id) for a in alerts]
         stages = await pipeline.storage.host_timeline("192.168.1.66")
         order = list(dict.fromkeys(s["tactic_id"] for s in stages))
         assert order[:3] == ["TA0007", "TA0011", "TA0010"], stages
@@ -132,6 +135,7 @@ async def test_campaign_and_timeline_routes(tmp_path):
     api = importlib.import_module("sih26145.api.app")
     with TestClient(api.app) as client:
         pipeline, alerts = await run_chain(tmp_path, storage=api.storage)
+        alerts = [a for a in alerts if not a.provisional]  # uncorrelated until confirmed
         cid = alerts[0].campaign_id
         camps = client.get("/api/v1/campaigns").json()["campaigns"]
         mine = next(c for c in camps if c["campaign_id"] == cid)

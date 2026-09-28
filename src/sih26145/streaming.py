@@ -29,7 +29,7 @@ class PipelineMetrics:
     def __init__(self, queue_max: int = 10_000):
         self.queue_max = queue_max
         self.packets = self.wire_bytes = self.flows_flushed = self.flows_scored = 0
-        self.drops = self.alerts = 0
+        self.drops = self.alerts = self.provisional = 0
         self.state = "starting"
         self.started = self.finished = None
         self.event_time: Optional[float] = None
@@ -37,7 +37,7 @@ class PipelineMetrics:
         self.flow_latency = deque(maxlen=10_000)   # flush -> scored, seconds
         self.alert_latency = deque(maxlen=10_000)  # flush -> alert published, seconds
         self._samples = deque(maxlen=int(RATE_WINDOW_S) + 1)
-        self.pipeline = self.queue = None
+        self.pipeline = self.queue = self.clock = None
 
     def sample(self) -> None:
         self._samples.append((time.perf_counter(), self.packets, self.wire_bytes, self.flows_scored))
@@ -83,12 +83,12 @@ async def run_stream(pipeline, pcap_path: str, speed: Optional[float] = None, ti
     drop = speed is not None if drop_when_full is None else drop_when_full
     queue: asyncio.Queue = asyncio.Queue(maxsize=m.queue_max)
     m.pipeline, m.queue, m.state, m.started = pipeline, queue, "running", time.perf_counter()
-    clock = _ReplayClock(speed)
+    clock = m.clock = _ReplayClock(speed)
     m.sample()
     consumer = asyncio.create_task(_consume(pipeline, queue, m, on_alert))
-    timer = asyncio.create_task(_timer(pipeline, queue, m, clock, tick, drop))
+    timer = asyncio.create_task(_timer(pipeline, queue, m, clock, tick, drop, on_alert))
     try:
-        await _produce(pipeline, PcapReader(pcap_path), queue, m, clock, tick, drop)
+        await _produce(pipeline, PcapReader(pcap_path), queue, m, clock, tick, drop, on_alert)
         await queue.put(None)  # end-of-input marker is never dropped
         await consumer
     finally:
@@ -125,8 +125,21 @@ async def _enqueue(flows: Iterable, queue: asyncio.Queue, m: PipelineMetrics, dr
             m.drops += 1
 
 
-async def _produce(pipeline, reader, queue, m: PipelineMetrics, clock: _ReplayClock, tick: float, drop: bool):
+async def _fast(pipeline, closed, m: PipelineMetrics, on_alert: Optional[Callable]) -> None:
+    """Provisional alerts of a closed fast-lane window, raised as soon as the window closes."""
+    if closed is None or not closed[1]:
+        return
+    for alert in await pipeline.raise_provisional(closed):
+        m.alerts += 1
+        m.provisional += 1
+        if on_alert is not None:
+            on_alert(alert)
+
+
+async def _produce(pipeline, reader, queue, m: PipelineMetrics, clock: _ReplayClock, tick: float, drop: bool,
+                   on_alert: Optional[Callable] = None):
     tracker, last_flush = pipeline.flow_tracker, None
+    fast = pipeline.fast_lane
     for n, pkt in enumerate(reader):
         if clock.speed:
             clock.start(pkt.timestamp)
@@ -138,18 +151,23 @@ async def _produce(pipeline, reader, queue, m: PipelineMetrics, clock: _ReplayCl
         m.packets += 1
         m.wire_bytes += pkt.packet_len
         m.event_time = pkt.timestamp
+        closed = fast.observe(pkt)
+        if closed is not None:
+            await _fast(pipeline, closed, m, on_alert)
         await _enqueue(tracker.process_packet(pkt), queue, m, drop)
         if not clock.speed and (last_flush is None or pkt.timestamp - last_flush >= tick):
             await _enqueue(tracker.flush_expired(pkt.timestamp), queue, m, drop)  # event-time idle sweep
             last_flush = pkt.timestamp
         if n % 256 == 0:
             await asyncio.sleep(0)
+    await _fast(pipeline, fast.flush(), m, on_alert)
     remaining = list(tracker._active_flows.values())
     tracker._active_flows.clear()
     await _enqueue(remaining, queue, m, drop)
 
 
-async def _timer(pipeline, queue, m: PipelineMetrics, clock: _ReplayClock, tick: float, drop: bool):
+async def _timer(pipeline, queue, m: PipelineMetrics, clock: _ReplayClock, tick: float, drop: bool,
+                 on_alert: Optional[Callable] = None):
     while True:
         await asyncio.sleep(tick)
         m.sample()
@@ -157,6 +175,7 @@ async def _timer(pipeline, queue, m: PipelineMetrics, clock: _ReplayClock, tick:
             # Waiting on the clock: capture time has really passed. Behind schedule: only
             # what has been ingested counts, so late packets don't split their flows.
             now = clock.now() if m.caught_up else m.event_time
+            await _fast(pipeline, pipeline.fast_lane.expire(now), m, on_alert)
             await _enqueue(pipeline.flow_tracker.flush_expired(now), queue, m, drop)
 
 

@@ -90,6 +90,7 @@ export const FEATURE_SHORT = {
   src_distinct_dsts_w: 'hosts touched', src_distinct_dst_ports_w: 'ports tried', src_syn_only_ratio_w: 'half-open share',
   src_egress_bytes_z: 'upload z-score', dst_reflector_flows_w: 'reflector flows', dst_reflector_bytes_w: 'reflector bytes',
   dst_reflector_mean_pkt_w: 'mean reflected packet', dst_bytes_vs_baseline: '× usual bytes', dst_flows_vs_baseline: '× usual flows', dst_flows_w: 'flows',
+  fl_dst_syn_srcs_1s: 'SYN sources in 1 s', fl_dst_refl_srcs_1s: 'reflectors in 1 s', fl_src_syn_targets_1s: 'SYN targets in 1 s',
 };
 
 const compact = (v) => (typeof v !== 'number' ? String(v)

@@ -41,6 +41,10 @@ class RuleDetectorSuite:
                 hits.append(hit)
         return hits
 
+    def last_fired(self, detector_name: str, entity: str):
+        """Event time of the last alert this suite let through for (detector, entity), or None."""
+        return self._last_fired.get((detector_name, entity))
+
     def _repeat(self, hit: RuleHit, ctx) -> bool:
         """One alert per (detector, entity) per dedupe period of event time; an ongoing
         flood or scan would otherwise raise an alert for every flow it contains."""

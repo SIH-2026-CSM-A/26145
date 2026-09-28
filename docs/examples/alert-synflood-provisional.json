@@ -1,0 +1,109 @@
+{
+    "$schema": "https://sih26145.ntro.gov.in/schemas/alert.v2.json",
+    "version": "2.0",
+    "alert_id": "urn:uuid:595f576f-0fb6-4d8e-8338-e5dbd5047b45",
+    "timestamp": "2026-09-21T14:24:02+00:00",
+    "flow_id": "win:dst:10.50.0.10:1790000641:1",
+    "threat_class": "THREAT_DDOS_VOLUME",
+    "confidence": 0.7,
+    "severity": "HIGH",
+    "evidence": [
+        {
+            "feature": "fl_dst_syn_srcs_1s",
+            "value": 106,
+            "baseline": 50,
+            "baseline_source": "rule_threshold"
+        },
+        {
+            "feature": "fl_dst_syn_only_share_1s",
+            "value": 1.0,
+            "baseline": 0.8,
+            "baseline_source": "rule_threshold"
+        },
+        {
+            "feature": "fl_dst_syns_1s",
+            "value": 106,
+            "baseline": null,
+            "baseline_source": null
+        },
+        {
+            "feature": "fl_dst_packets_1s",
+            "value": 106,
+            "baseline": null,
+            "baseline_source": null
+        },
+        {
+            "feature": "fl_dst_src_entropy_1s",
+            "value": 6.727920454563199,
+            "baseline": null,
+            "baseline_source": null
+        },
+        {
+            "feature": "fl_dst_ttl_spread_1s",
+            "value": 0,
+            "baseline": null,
+            "baseline_source": null
+        }
+    ],
+    "observability_state": null,
+    "substitutions": [],
+    "contract_version": "1.4.0",
+    "model_version": "rules-2.1.0",
+    "campaign_id": null,
+    "host_stage": "TA0040",
+    "record_hash": "c6eb3f7e9752307e3e7f5fb62109619ee80ea14f65fee68c27e442ce8fe65dd6",
+    "provisional": true,
+    "confirms": null,
+    "contributing_flows": [
+        "1:p8nnZM4XY9OISo+cjsfP1iZh1Vc=",
+        "1:tJgIZW/upWF9qZ1LtwQ6dozFrk8=",
+        "1:i+SIq7hgP0wOVqx6EjlwFbbI7Vg=",
+        "1:NGS7N4yMs//PKifQnxyOKrWtbU4=",
+        "1:GRM+RjuZOnDnNtkJYU5NAeQBH04="
+    ],
+    "detector": {
+        "name": "fastlane_detector",
+        "type": "RULE",
+        "version": "2.1.0"
+    },
+    "detection": {
+        "rule_matches": [
+            "RULE_FAST_SYN_FLOOD"
+        ],
+        "ml_scores": [],
+        "metrics": {
+            "fl_dst_syn_srcs_1s": 106,
+            "fl_dst_syn_only_share_1s": 1.0,
+            "fl_dst_syns_1s": 106,
+            "fl_dst_packets_1s": 106,
+            "fl_dst_src_entropy_1s": 6.727920454563199,
+            "fl_dst_ttl_spread_1s": 0
+        },
+        "lane": "fast lane, 1-s window",
+        "entity": "10.50.0.10",
+        "correlation": {
+            "campaign_id": null,
+            "host": "10.50.0.10",
+            "tactic": "Impact",
+            "joined_on": [],
+            "not_merged": [],
+            "refused_pivots": [],
+            "note": "provisional: correlated when the flow lane confirms"
+        }
+    },
+    "flow": {
+        "src_ip": "20.0.21.213",
+        "dst_ip": "10.50.0.10",
+        "dst_port": 80,
+        "protocol": "TCP",
+        "window_start": "2026-09-21T14:24:01+00:00",
+        "window_end": "2026-09-21T14:24:02+00:00",
+        "src_port": 1299
+    },
+    "feature_summary": {
+        "total_packets": 106,
+        "total_bytes": 0,
+        "pps": 106.0,
+        "bps": 0.0
+    }
+}

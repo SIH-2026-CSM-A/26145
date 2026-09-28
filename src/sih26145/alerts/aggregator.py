@@ -52,6 +52,71 @@ def _flow_id(flow: FlowRecord) -> str:
     return community_id(key.protocol, key.src_ip, key.dst_ip, key.src_port or 0, key.dst_port)
 
 
+# Detectors whose hits name a destination or a source rather than one flow (RuleHit.entity).
+# Their alerts get a window flow_id and the top contributing flows (docs/ARCHITECTURE.md §10).
+AGGREGATE_SCOPE = {"ddos_volume_detector": "dst", "recon_portscan_detector": "src",
+                   "dga_lexical_detector": "src", "dns_tunnel_detector": "src", "fastlane_detector": None}
+TOP_N = 5
+
+
+def window_id(scope: str, entity: str, start: float, length: float) -> str:
+    """flow_id of an aggregate alert: win:<dst|src>:<ip>:<window start, epoch s>:<length s>."""
+    return f"win:{scope}:{entity}:{int(start)}:{int(length)}"
+
+
+class WindowTopFlows:
+    """Top-N flows by bytes per destination and per source in the current store window, kept
+    so an aggregate alert can name the flows that made it. Bounded: `cap` entities per scope."""
+
+    def __init__(self, window: float, n: int = TOP_N, cap: int = 4096):
+        self.window, self.n, self.cap = window, n, cap
+        self._t = {"dst": {}, "src": {}}  # entity -> [wid, [(bytes, cid), ...]]
+
+    def update(self, flow: FlowRecord) -> None:
+        wid, cid, nbytes = int(flow.last_time // self.window), _flow_id(flow), flow.total_bytes
+        for scope, ip in (("dst", flow.flow_key.dst_ip), ("src", flow.flow_key.src_ip)):
+            table = self._t[scope]
+            row = table.get(ip)
+            if row is None or row[0] != wid:
+                if row is None and len(table) >= self.cap:
+                    table.pop(next(iter(table)))
+                row = table[ip] = [wid, []]
+            top = row[1]
+            if len(top) < self.n or nbytes > top[-1][0]:
+                top.append((nbytes, cid))
+                top.sort(key=lambda x: -x[0])
+                del top[self.n:]
+
+    def top(self, scope: str, ip: str, trigger: str) -> List[str]:
+        row = self._t[scope].get(ip)
+        rest = [cid for _, cid in (row[1] if row else ()) if cid != trigger]
+        return [trigger] + rest[: self.n - 1]
+
+
+def provisional_alert(scope: str, hit: RuleHit, win) -> Alert:
+    """A fast-lane hit as an alert v2: provisional until the flow lane confirms it."""
+    rows, metrics = _split_evidence(hit.evidence, load_contract().features)
+    tuples = win.contributing(scope, hit.entity, TOP_N)
+    proto, src, dst, sport, dport = tuples[0]
+    packets = win.packets(scope, hit.entity)
+    start = datetime.fromtimestamp(win.start, tz=timezone.utc).isoformat()
+    end = datetime.fromtimestamp(win.start + 1.0, tz=timezone.utc).isoformat()
+    return Alert(
+        threat_class=hit.threat_class,
+        detector={"name": hit.detector_name, "type": "RULE", "version": RULESET_VERSION},
+        flow={"src_ip": src, "dst_ip": dst, "dst_port": int(dport or 0), "protocol": proto,
+              "window_start": start, "window_end": end, "src_port": int(sport or 0)},
+        confidence=float(hit.confidence), severity=hit.severity,
+        detection={"rule_matches": [hit.rule_id], "ml_scores": [], "metrics": metrics,
+                   "lane": "fast lane, 1-s window", "entity": hit.entity},
+        feature_summary={"total_packets": int(packets or 0), "total_bytes": 0, "pps": float(packets or 0), "bps": 0.0},
+        evidence=rows, flow_id=window_id(scope, hit.entity, win.start, 1.0),
+        observability_state=None,  # measured per flow; the fast lane sees packets, not flows
+        model_version=f"rules-{RULESET_VERSION}", timestamp=end, provisional=True,
+        contributing_flows=[community_id(*t) for t in tuples],
+    )
+
+
 def _split_evidence(raw: Dict[str, Any], features) -> tuple:
     """RuleHit evidence -> (v2 evidence rows for contract features, flat metrics dict)."""
     rows, metrics = [], {}
@@ -76,8 +141,10 @@ class EvidenceAggregator:
     are only attached to rule alerts.
     """
 
-    def __init__(self, ml_can_alert: bool = ML_MODEL_VERSION != "synthetic-baseline"):
+    def __init__(self, ml_can_alert: bool = ML_MODEL_VERSION != "synthetic-baseline",
+                 top: Optional[WindowTopFlows] = None):
         self.ml_can_alert = ml_can_alert
+        self.top = top  # set by the orchestrator: aggregate alerts then name their top flows
 
     def _attach(self, groups: Dict[str, Dict[str, Any]], flagged: List[MLPrediction]) -> None:
         """Rule + model on the same flow. Closed gate: the scores are attached and nothing
@@ -119,6 +186,7 @@ class EvidenceAggregator:
                     "metrics": metrics,
                     "evidence": rows,
                     "substitutions": [deepcopy(s) for s in rh.substitutions],
+                    "entity": rh.entity,
                 }
             else:
                 if rh.rule_id not in threat_groups[tc]["rule_matches"]:
@@ -190,6 +258,12 @@ class EvidenceAggregator:
                 "HYBRID_RULE_ML": f"rules-{RULESET_VERSION}+ml-{ML_MODEL_VERSION}",
             }[data["detector_type"]]
 
+            scope, entity = AGGREGATE_SCOPE.get(data["detector_name"]), data.get("entity")
+            aggregate_id = contributing = None
+            if scope and entity:
+                wstart = (flow.last_time // self.top.window) * self.top.window if self.top else flow.last_time
+                aggregate_id = window_id(scope, entity, wstart, self.top.window if self.top else 0)
+                contributing = self.top.top(scope, entity, flow_id) if self.top else [flow_id]
             alert = Alert(
                 threat_class=tc,
                 detector=detector_info,
@@ -200,10 +274,12 @@ class EvidenceAggregator:
                     "rule_matches": data["rule_matches"],
                     "ml_scores": data["ml_scores"],
                     "metrics": data["metrics"],
+                    **({"entity": entity} if aggregate_id else {}),
                 },
                 feature_summary=feature_summary,
                 evidence=data["evidence"],
-                flow_id=flow_id,
+                flow_id=aggregate_id or flow_id,
+                contributing_flows=contributing,
                 observability_state=flow.observability_state,
                 substitutions=data["substitutions"],
                 model_version=model_version,

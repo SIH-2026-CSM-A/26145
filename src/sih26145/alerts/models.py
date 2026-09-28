@@ -60,6 +60,13 @@ class Alert:
     campaign_id: Optional[str] = None
     host_stage: Optional[str] = None
     record_hash: Optional[str] = None
+    # Fast lane (docs/ARCHITECTURE.md §9a): true until the flow lane confirms; the confirming
+    # alert names the provisional one in `confirms`.
+    provisional: bool = False
+    confirms: Optional[str] = None
+    # Aggregate alerts (per destination / per source): flow_id is a window id and these are the
+    # Community IDs of the top contributing flows, the triggering flow first (§10).
+    contributing_flows: Optional[List[str]] = None
     version: str = "2.0"
     alert_id: str = field(default_factory=lambda: f"urn:uuid:{uuid.uuid4()}")
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -87,6 +94,9 @@ class Alert:
             "campaign_id": self.campaign_id,
             "host_stage": self.host_stage,
             "record_hash": self.record_hash,
+            "provisional": self.provisional,
+            "confirms": self.confirms,
+            "contributing_flows": list(self.contributing_flows) if self.contributing_flows is not None else None,
             "detector": deepcopy(self.detector),
             "detection": deepcopy(self.detection),
             "flow": deepcopy(self.flow),

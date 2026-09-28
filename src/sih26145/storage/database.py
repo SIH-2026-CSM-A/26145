@@ -1,5 +1,6 @@
 """Async SQLite storage engine for versioned threat alerts (sih26145.alert.v2)."""
 
+import asyncio
 import json
 import os
 import aiosqlite
@@ -21,6 +22,7 @@ class AlertStorage:
         self._initialized = False
         self._head = GENESIS  # record_hash of the last stored alert (storage/chain.py)
         self._seq = 0
+        self._save_lock = asyncio.Lock()  # the fast lane and the flow lane both append to the chain
 
     async def get_connection(self) -> aiosqlite.Connection:
         """Get or create persistent database connection."""
@@ -124,15 +126,16 @@ class AlertStorage:
         never replaced; a duplicate alert_id is an error."""
         await self.init_db()
         conn = await self.get_connection()
-        alert.record_hash = None
-        alert.record_hash = record_hash(self._head, alert.to_dict())
-        alert_dict = alert.to_dict()
-        try:
-            await self._insert(conn, alert, alert_dict)
-        except Exception:
-            await conn.rollback()
-            raise
-        self._seq, self._head = self._seq + 1, alert.record_hash
+        async with self._save_lock:
+            alert.record_hash = None
+            alert.record_hash = record_hash(self._head, alert.to_dict())
+            alert_dict = alert.to_dict()
+            try:
+                await self._insert(conn, alert, alert_dict)
+            except Exception:
+                await conn.rollback()
+                raise
+            self._seq, self._head = self._seq + 1, alert.record_hash
         return alert.alert_id
 
     async def _insert(self, conn, alert: Alert, alert_dict: dict) -> None:

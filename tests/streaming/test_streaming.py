@@ -82,9 +82,10 @@ async def test_alerts_reach_sse_subscribers_as_produced(tmp_path):
     finally:
         api.broadcaster.unsubscribe(sub)
         await pipeline.storage.close()
-    assert m.alerts == 1 and sub.qsize() == 1
-    event, payload = sub.get_nowait()
-    assert event == "alert" and payload["threat_class"] == "THREAT_RECON_PORTSCAN"
+    assert m.alerts == 2 and m.provisional == 1 and sub.qsize() == 2
+    (e1, fast), (e2, confirmed) = sub.get_nowait(), sub.get_nowait()
+    assert e1 == e2 == "alert" and fast["threat_class"] == confirmed["threat_class"] == "THREAT_RECON_PORTSCAN"
+    assert fast["provisional"] and confirmed["confirms"] == fast["alert_id"]
 
 
 @pytest.mark.asyncio

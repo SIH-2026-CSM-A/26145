@@ -19,7 +19,7 @@ V2_KEYS = {
     "$schema", "version", "alert_id", "timestamp", "flow_id", "threat_class", "confidence",
     "severity", "evidence", "observability_state", "substitutions", "contract_version",
     "model_version", "campaign_id", "host_stage", "record_hash", "detector", "detection",
-    "flow", "feature_summary",
+    "flow", "feature_summary", "provisional", "confirms", "contributing_flows",
 }
 CLIENT, SERVER = ("192.168.1.52", 54585), ("8.8.8.8", 53)
 

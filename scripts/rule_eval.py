@@ -93,7 +93,9 @@ def detector_key(alert: dict) -> str:
 def label_alert(alert: dict, idx, infected: set, normal: set) -> tuple:
     """(outcome, via): outcome in tp/fp/unknown, via in flow/entity/-."""
     start = datetime.fromisoformat(alert["flow"]["window_start"]).timestamp()
-    for s, code in idx.get(alert["flow_id"], ()):
+    # an aggregate alert's flow_id is a window id; its triggering flow is contributing_flows[0]
+    trigger = (alert.get("contributing_flows") or [alert["flow_id"]])[0]
+    for s, code in idx.get(trigger, ()):
         if abs(s - start) <= TOL:
             if code == "botnet":
                 return "tp", "flow"

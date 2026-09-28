@@ -39,19 +39,19 @@ index N: <reason>` and exits 1.
 
 ## Worked sequence
 
-Run on 2026-09-28 with the committed demo capture. The hashes below are that run's output. A new
+Run on 2026-09-28 with the committed demo capture, after the fast lane was added. The hashes below are that run's output. A new
 run gives different ones, because `alert_id` is a fresh UUID each time.
 
 ```bash
 export SIH26145_INTERNAL_CIDRS=147.32.0.0/16,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12
 uv run sih26145 analyze demo/demo.pcap --db /tmp/log.db
-# Analysis complete. Total alerts generated: 10
+# Analysis complete. Total alerts generated: 12   (10 flow-lane + 2 provisional fast-lane)
 
 uv run sih26145 verify-log --db /tmp/log.db
-# verified: 10 records, chain head 9eae3614…35111
+# verified: 12 records, chain head 08edf242…0330f
 
 uv run sih26145 export --db /tmp/log.db --out /tmp/bundle
-# exported 10 alerts to /tmp/bundle; alerts.jsonl sha256 331a9867…20528
+# exported 12 alerts to /tmp/bundle; alerts.jsonl sha256 f43df07c…e0364
 
 ls /tmp/bundle
 # alerts.jsonl  chain_head.txt  manifest.json  section63_datasheet.md

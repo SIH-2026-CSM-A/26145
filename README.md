@@ -161,7 +161,7 @@ Open `http://localhost:3000` in your browser to inspect live traffic metrics, th
 - `GET /api/v1/alerts`: Query persisted threat alerts with filtering (`threat_class`, `severity`).
 - `GET /api/v1/stream/alerts`: Server-Sent Events (SSE) live event stream pushing alerts to client dashboards.
 
-Example alerts, exactly as `GET /api/v1/alerts/{alert_id}` returned them for `demo/demo.pcap` (pretty-printed, content unchanged): a per-flow exfiltration alert, [`docs/examples/alert-exfil.json`](docs/examples/alert-exfil.json), and an aggregate SYN-flood alert, [`docs/examples/alert-synflood.json`](docs/examples/alert-synflood.json). Exporting the log for one-way transfer (bundle files, `verify-log`, the BSA 2023 s.63 data sheet): [`docs/EXPORT.md`](docs/EXPORT.md).
+Example alerts, exactly as `GET /api/v1/alerts/{alert_id}` returned them for `demo/demo.pcap` (pretty-printed, content unchanged): a per-flow exfiltration alert, [`docs/examples/alert-exfil.json`](docs/examples/alert-exfil.json), an aggregate SYN-flood alert from the flow lane, [`docs/examples/alert-synflood.json`](docs/examples/alert-synflood.json) (its `flow_id` is a window id, `contributing_flows` names the top flows, and `confirms` points at the fast-lane alert), and that provisional fast-lane alert, [`docs/examples/alert-synflood-provisional.json`](docs/examples/alert-synflood-provisional.json). Exporting the log for one-way transfer (bundle files, `verify-log`, the BSA 2023 s.63 data sheet): [`docs/EXPORT.md`](docs/EXPORT.md).
 
 ---
 

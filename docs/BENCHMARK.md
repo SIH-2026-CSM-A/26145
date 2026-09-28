@@ -165,6 +165,79 @@ Alerts: 5,274 C2-beacon, 813 LightGBM-only, 155 exfiltration and 5 DDoS, on 541,
 fire on unlabelled background hosts. Precision against the CTU labels is in `docs/RULES.md` §4;
 this is an alert-volume observation, not a precision figure.
 
+## Fast lane (2026-09-28)
+
+The fast lane (`docs/ARCHITECTURE.md` §9a) counts packets in 1-s windows before flow assembly and
+raises provisional alerts for floods and scans. `scripts/fastlane_bench.py` measures it. Data:
+`26145-data/bench/s7-fastlane/`. Same laptop, idle (1-min load ≤ 0.36; another project's six
+Docker containers stayed up, as in session 6).
+
+### Packet → alert latency
+
+Each generated capture is followed by 45 s of unrelated traffic at 1 packet/s, so its flows close
+by idle timeout, as on a live link, and not at end of file. It is replayed at **1× real time**
+through the full pipeline. Latency runs from the ingest of the capture's first attack packet to
+the alert's publication. There are 20 runs per capture, each shifting the attack by 0.05 s
+against the 1-s window grid; p95 and p99 are interpolated from those 20 values. Every run raised
+the fast-lane alert and the flow-lane alert confirming it.
+
+| Capture | Attack | Fast lane (provisional) p50 / p95 / p99 | Flow lane (confirming) p50 / p95 / p99 |
+|---|---|---|---|
+| `syn_flood` | 500 spoofed sources, 2 SYNs each, over 10 s (~110 sources/s) | **1,526 / 1,957 / 1,983 ms** | 20,057 / 20,062 / 20,065 ms |
+| `spoofed_flood` | 5,000 SYNs in 1 s, a new random source per packet | **528 / 956 / 995 ms** | 15,176 / 15,203 / 15,205 ms |
+| `udp_reflection` | 200 reflectors, 1,400-byte answers, over 10 s | **1,028 / 1,460 / 1,495 ms** | 25,434 / 25,446 / 25,451 ms |
+| `port_sweep` | SYN scan of 100 ports in 0.5 s | **1,002 / 1,497 / 1,499 ms** | 16,070 / 16,075 / 16,076 ms |
+
+How to read it:
+- **The fast lane's latency is its window.** An alert comes out when the 1-s window in which the
+  evidence crosses the threshold closes, i.e. at the first packet of the next second. The
+  `syn_flood` reaches 50 distinct sources only in its second window, so it takes about 1.5 s.
+- **The flow lane waits for flows to close** (15 s idle; a SYN flood source that retries after
+  1 s closes 16 s after its first SYN). The reflection flows last 10 s before idling. The flow
+  lane's figures are timeouts, not processing.
+
+### Packets-per-second ceiling: parser + fast lane
+
+These are 2,000,000 64-byte Ethernet/IPv4/TCP SYN frames to one destination, stamped at 1 GbE
+line rate for 64-byte frames (1,488,095 packets/s). They are read by the real reader and parser
+and fed to the fast lane, unthrottled, on one core. There are three runs; the ceiling is their
+mean.
+
+| Sources | Parser alone | Parser + fast lane (ceiling) | Runs |
+|---|---|---|---|
+| A new random source every packet (spoofed) | 122,696 pps | **107,959 pps** | 3 |
+| 1,000 sources | 128,642 pps | **115,982 pps** | 3 |
+
+So the fast lane costs about 10–12% of the parser's rate on a 64-byte flood. The parser itself
+(dpkt) is the ceiling, at about 8% of 1 GbE line rate for minimum-size frames. With random
+sources, the per-source table is full (65,536 entities per window) after the first 65,536
+packets of each second: 1,868,897 source entries were not tracked (`FastLane.overflow`). The
+per-destination counters, which the flood rules read, are unaffected. A scanner hidden inside a
+spoofed flood of this rate would not be seen by the fast lane.
+
+**Drops at and beyond the ceiling are modelled, not measured.** The sensor reads files, so there
+is no capture ring to overflow. The model is as follows:
+- a second run records each packet's service time;
+- a FIFO ring of 16,384 slots in front of one core is replayed against arrivals at a fixed rate;
+- a packet that finds the ring full is counted as dropped.
+
+| Sources | Offered | Modelled drops (of 2,000,000) |
+|---|---|---|
+| random | 1.0× ceiling, 107,959 pps | 1,936 (0.10%) |
+| random | 1.5× ceiling, 161,939 pps | 652,265 (32.6%) |
+| 1,000 | 1.0× ceiling, 115,982 pps | 19,022 (0.95%) |
+| 1,000 | 1.5× ceiling, 173,972 pps | 673,496 (33.7%) |
+
+At exactly the ceiling, drops come from bursts: service time is not uniform. At 1.5×, about a
+third of packets are lost, as expected for a server running at 2/3 of the offered rate.
+
+### Cost on the s12 benchmark
+
+The CTU-13 s12 unthrottled run with the fast lane in the producer gave **856.8 and 857.4 flows/s**
+(222.1 and 222.3 Mbps), with the same 91 alerts. The session-5 mean without it is 859.5, so the
+difference is 0.3%, inside run-to-run spread. Measured alone, the fast lane costs 0.15 µs per s12
+packet (352,266 packets, 0.06 s).
+
 ## Profile: top five hot spots
 
 cProfile over the unthrottled scenario-12 run: 22.7 s under the profiler against about 10 s
@@ -196,6 +269,8 @@ uv run python scripts/benchmark.py $P --speed 184 --json $B/s12-paced.json   # ~
 uv run python scripts/benchmark.py $P --speed 736 --queue-max 1000           # overload, drops counted
 uv run python scripts/benchmark.py $P --profile $B/s12.prof                  # profile (rates not quotable)
 uv run python scripts/benchmark.py $E/11/botnet-capture-20110818-bot-2.pcap  # largest completed
+uv run python scripts/fastlane_bench.py latency syn_flood --runs 20 --json lat.json   # fast lane, 1x (also spoofed_flood, udp_reflection, port_sweep)
+uv run python scripts/fastlane_bench.py ceiling --packets 2000000 [--sources 1000]     # parser + fast lane pps
 SIH26145_INTERNAL_CIDRS=147.32.0.0/16 uv run python scripts/benchmark.py \
   ~/NewProjects/26145-data/ctu13-extended/capture20110819.truncated.pcap     # mixed traffic
 ```

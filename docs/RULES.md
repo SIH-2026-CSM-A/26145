@@ -174,6 +174,10 @@ it is stated here instead of re-tuning per scenario.
 - **Recall.** A TP here means that an alert landed on an infected host's flow. The labels do not
   say which of the botnet's flows were C2, scanning or exfiltration.
 - **Anything for DGA, tunnel or TLS** (header-only data).
+- **The fast lane** (`RULE_FAST_*`, ARCHITECTURE §9a). It was added after these runs, and its
+  provisional alerts were not measured on CTU-13-Extended. Since then, aggregate alerts carry a
+  window `flow_id`; `rule_eval.py` joins them on `contributing_flows[0]`, the triggering flow, so
+  the flow join above is unchanged.
 - **LightGBM precision:** the model is in-sample on all five scenarios, and its counts change
   slightly only because agreement with rules changed.
 

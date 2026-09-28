@@ -222,9 +222,12 @@ async def _query(sql: str, params=()) -> list:
 
 @app.get("/api/v1/stats/classes")
 async def class_stats():
-    """Alert count and latest event time per threat class, over the whole log (for the class tiles)."""
-    rows = await _query("SELECT threat_class, COUNT(*), MAX(timestamp) FROM alerts GROUP BY threat_class")
-    return {"classes": {c: {"count": n, "last_seen": t} for c, n, t in rows}}
+    """Per threat class over the whole log (the class tiles): `count` of flow-lane alerts, `provisional`
+    fast-lane alerts (each is later confirmed by a flow-lane alert, which `count` includes, or
+    stays unconfirmed), and the latest event time."""
+    rows = await _query("SELECT threat_class, COUNT(*), COALESCE(SUM(json_extract(json_data, '$.provisional')), 0), "
+                        "MAX(timestamp) FROM alerts GROUP BY threat_class")
+    return {"classes": {c: {"count": n - p, "provisional": p, "last_seen": t} for c, n, p, t in rows}}
 
 
 @app.get("/api/v1/chain/blocks")

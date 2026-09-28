@@ -15,6 +15,11 @@ export default function ThreatTiles({ stats, pulse, tileRefs, alerts }) {
         const count = rows.reduce((s, r) => s + r.count, 0);
         const k = pulse[t.id] || 0;
         const latest = alerts.find((a) => t.classes.includes(a.threat_class)); // alerts are newest first
+        // fast lane: a provisional alert is drawn outlined until a flow-lane alert confirms it
+        const confirmed = new Set(alerts.map((a) => a.confirms).filter(Boolean));
+        const waiting = latest?.provisional && !confirmed.has(latest.alert_id);
+        const first = latest?.confirms && alerts.find((a) => a.alert_id === latest.confirms);
+        const pending = alerts.filter((a) => a.provisional && t.classes.includes(a.threat_class) && !confirmed.has(a.alert_id)).length;
         const split = t.classes.length > 1 && rows.length ? t.classes.map((c) => `${classInfo(c).short} ${stats?.[c]?.count || 0}`).join(' · ') : null;
         return (
           <div key={t.id} ref={(el) => { tileRefs.current[t.id] = el; }} data-testid={`tile-${t.id}`} data-pulses={k}
@@ -32,12 +37,17 @@ export default function ThreatTiles({ stats, pulse, tileRefs, alerts }) {
                 </div>
                 <div className="shrink-0 text-right">
                   {count ? <Counter value={count} className="kpi text-5xl" style={{ color, textShadow: `0 0 24px ${color}88` }} />
+                         : pending ? <span className="kpi text-5xl" data-testid={`tile-${t.id}-provisional`} style={{ color: 'transparent', WebkitTextStroke: `1.5px ${color}` }}>{pending}</span>
                          : <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-base font-medium text-dim"><span className="h-2.5 w-2.5 animate-pulse rounded-full" style={{ background: color }} />watching</span>}
                 </div>
               </div>
               {latest && (
-                <div className="mt-2 min-h-0 rounded-lg bg-ink/50 px-3 py-1.5 ring-1 ring-line/10" data-testid={`tile-${t.id}-latest`}>
-                  <div className="truncate text-xs text-faint">latest <span className="font-mono">{fmtTime(latest.timestamp)}</span>{split ? ` · ${split}` : ''}</div>
+                <div className={`mt-2 min-h-0 rounded-lg px-3 py-1.5 ${waiting ? 'border border-dashed bg-transparent' : 'bg-ink/50 ring-1 ring-line/10'}`}
+                     style={waiting ? { borderColor: color } : undefined} data-testid={`tile-${t.id}-latest`} data-provisional={waiting ? 'true' : 'false'}>
+                  <div className="truncate text-xs text-faint">
+                    {waiting ? <span style={{ color }}>provisional · fast lane, 1 s · not yet confirmed</span>
+                             : <>latest <span className="font-mono">{fmtTime(latest.timestamp)}</span>{first ? ` · confirmed; fast lane flagged it at ${fmtTime(first.timestamp)}` : ''}{split ? ` · ${split}` : ''}</>}
+                  </div>
                   <div className="line-clamp-2 font-mono text-sm leading-snug text-fg">{evidenceLine(latest)}</div>
                 </div>
               )}

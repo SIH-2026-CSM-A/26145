@@ -83,6 +83,16 @@ def test_correlator_reads_match_declaration():
     assert reads == set(contract.consumer("campaign_correlator").reads)
 
 
+def test_fastlane_reads_match_declaration():
+    import sih26145.detectors.fastlane as fastlane
+    contract = load_contract()
+    cls = next(n for n in ast.parse(inspect.getsource(fastlane)).body
+               if isinstance(n, ast.ClassDef) and n.name == "FastLaneDetector")
+    reads = scan_reads(cls)
+    assert contract.read_violations("fastlane_detector", reads) == []
+    assert reads == set(contract.consumer("fastlane_detector").reads)
+
+
 def test_every_feature_vector_field_is_declared():
     contract = load_contract()
     fields = {f.name for f in dataclasses.fields(FeatureVector)} - {"flow_key_str"}

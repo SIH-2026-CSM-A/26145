@@ -1,5 +1,5 @@
 // Headless smoke test of the served dashboard, opened before the (paced) replay raises alerts:
-// the hero renders, a threat tile pulses when an alert lands, the campaign map draws with no two
+// the hero renders, a fast-lane alert shows outlined and then confirmed, a threat tile pulses when an alert lands, the campaign map draws with no two
 // labels overlapping, clicking a line opens the case file, Verify recomputes the chain, the 2D
 // fallback (?nogl) renders, and no request leaves the origin.
 // Usage: node tests/smoke.mjs http://127.0.0.1:8765 [screenshot-dir]
@@ -20,6 +20,14 @@ try {
   await page.waitForSelector('[data-testid="hero-webgl"], [data-testid="hero-2d"]', { timeout: 15000 }).catch(() => fail('hero did not render'));
   console.log(`hero: ${await page.locator('[data-testid="hero-webgl"]').count() ? 'webgl' : '2d'}`);
   await page.waitForSelector('[data-testid="bytes-back"]');
+
+  // fast lane: a tile shows an outlined provisional alert, then the flow-lane alert confirming it
+  await page.waitForFunction(() => document.querySelector('[data-provisional="true"]') !== null, null, { timeout: 120000, polling: 50 })
+    .catch(() => fail('no provisional (outlined) fast-lane alert appeared on a tile'));
+  if (shots) await page.screenshot({ path: `${shots}/provisional-1920x1080.png` });
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-testid$="-latest"]')].some((e) => /fast lane flagged it/.test(e.textContent)),
+    null, { timeout: 120000, polling: 250 }).catch(() => fail('no tile showed a fast-lane alert confirmed by the flow lane'));
+  console.log('fast lane: provisional outline seen, then confirmed');
 
   await page.waitForFunction(() => [...document.querySelectorAll('[data-testid^="tile-"][data-pulses]')].some((t) => +t.dataset.pulses > 0),
     null, { timeout: 120000, polling: 250 }).catch(() => fail('no threat tile pulsed on an alert within 120 s'));

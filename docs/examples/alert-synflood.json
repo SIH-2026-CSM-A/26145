@@ -1,9 +1,9 @@
 {
     "$schema": "https://sih26145.ntro.gov.in/schemas/alert.v2.json",
     "version": "2.0",
-    "alert_id": "urn:uuid:1877a6fd-0757-4a13-b913-610b121c8a47",
+    "alert_id": "urn:uuid:a61c8fd9-a07e-420c-aa00-b2ece866c48c",
     "timestamp": "2026-09-21T14:24:04.633688+00:00",
-    "flow_id": "1:skncIG8BerCBdkd1h/+2YOHpYxc=",
+    "flow_id": "win:dst:10.50.0.10:1790000640:60",
     "threat_class": "THREAT_DDOS_VOLUME",
     "confidence": 0.9,
     "severity": "CRITICAL",
@@ -29,11 +29,20 @@
     ],
     "observability_state": "forward_only",
     "substitutions": [],
-    "contract_version": "1.3.0",
+    "contract_version": "1.4.0",
     "model_version": "rules-2.1.0",
-    "campaign_id": "camp-86ff9d5f57a4",
+    "campaign_id": "camp-86f39f0594fc",
     "host_stage": "TA0040",
-    "record_hash": "c56d8871fdf1d8811c9c4e3c7910b85d11d54b2a66da9e84fab2fadccf0600e6",
+    "record_hash": "8efe62edc9ee9caedd876f55172bd5f3641b2ba19fd748ad0080e6cf1f30775e",
+    "provisional": false,
+    "confirms": "urn:uuid:595f576f-0fb6-4d8e-8338-e5dbd5047b45",
+    "contributing_flows": [
+        "1:skncIG8BerCBdkd1h/+2YOHpYxc=",
+        "1:tJgIZW/upWF9qZ1LtwQ6dozFrk8=",
+        "1:NGS7N4yMs//PKifQnxyOKrWtbU4=",
+        "1:uyd5dIS8L+r+eQmzuCxPLydxU9w=",
+        "1:h2iiQOPii5r9KgiYZZMLlf+3rBc="
+    ],
     "detector": {
         "name": "ddos_volume_detector",
         "type": "RULE",
@@ -49,8 +58,9 @@
             "dst_src_ip_entropy_w": 6.470950066927685,
             "dst_syn_only_ratio_w": 1.0
         },
+        "entity": "10.50.0.10",
         "correlation": {
-            "campaign_id": "camp-86ff9d5f57a4",
+            "campaign_id": "camp-86f39f0594fc",
             "host": "10.50.0.10",
             "tactic": "Impact",
             "joined_on": [],

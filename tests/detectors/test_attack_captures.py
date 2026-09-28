@@ -31,6 +31,7 @@ def by_rule(alerts):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("scenario,threat_class,rule", [
     ("syn_flood", "THREAT_DDOS_VOLUME", "RULE_DDOS_SYN_FLOOD"),
+    ("spoofed_flood", "THREAT_DDOS_VOLUME", "RULE_DDOS_SYN_FLOOD"),
     ("udp_reflection", "THREAT_DDOS_VOLUME", "RULE_DDOS_UDP_REFLECTION"),
     ("single_source_flood", "THREAT_DDOS_VOLUME", "RULE_DDOS_VOLUME_BASELINE"),
     ("dns_tunnel", "THREAT_DNS_TUNNEL", "RULE_DNS_TUNNEL_VOLUME_LENGTH"),
@@ -100,7 +101,11 @@ async def test_recon_skips_shared_infrastructure(tmp_path, shared):
     if shared:  # 30 hosts already use the target: it is a shared server, not a scan victim
         packets += sum((_web(T0 + i, f"10.60.0.{i + 1}", target, 47000 + i) for i in range(30)), [])
     recon = [a for a in await alerts_for(tmp_path, packets) if a.threat_class == "THREAT_RECON_PORTSCAN"]
-    assert len(recon) == (0 if shared else 1)
+    assert len([a for a in recon if not a.provisional]) == (0 if shared else 1)
+    # the suppression is flow-lane only: the fast lane still flags the sweep, and on a shared
+    # server nothing confirms it (docs/ARCHITECTURE.md §9a)
+    (fast,) = [a for a in recon if a.provisional]
+    assert any(a.confirms == fast.alert_id for a in recon) == (not shared)
 
 
 def test_ramnit_dga_reproduces_published_domains():

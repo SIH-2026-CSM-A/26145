@@ -42,6 +42,8 @@ flowchart LR
       FS[FlowSource adapter]
     end
     FS --> FT[Flow assembly<br/>bidirectional match<br/>observability_state]
+    FS --> FL[Fast lane<br/>1-s packet counters<br/>provisional a / e]
+    FL --> A
     FT --> Q[[asyncio bounded queue<br/>drop counter]]
     Q --> T1[Tier 1: per-flow FeatureVector]
     Q --> T2[Tier 2: FeatureStore<br/>per-host / per-dst / per-pair<br/>HLL + Count-Min]
@@ -257,6 +259,52 @@ flow's flush (enqueue) to its alert being published; the wait from a flow's last
 its flush is bounded separately by `idle_timeout + tick`. When the producer is behind the
 replay clock the timer flushes on ingested event time, so late packets do not split flows.
 
+## 9a. Fast lane for floods (a) and scans (e)
+
+The flow lane scores a flow when it closes, so a flood or a scan is reported 15–60 s (capture
+time) after it starts. The fast lane (`detectors/fastlane.py`) sits in the producer, before flow
+assembly, and sees every parsed packet.
+
+- **Windows:** tumbling 1-s windows of event time (`int(timestamp)`). A window closes when the
+  first packet of a later second arrives, when the replay timer passes its end with no packet
+  (paced/live), or at end of input. A packet stamped earlier than the open second is counted in
+  it.
+- **Counters** (contract rows `fl_*_1s`, contract 1.4.0). A table is opened only by a SYN without
+  ACK, or by UDP from a `REFLECTOR_PORTS` source; every other packet costs one dict lookup.
+  - Per destination: packets, SYNs, distinct SYN sources and how many also sent an ACK-bearing
+    packet, SYN-source entropy, TTL spread of the SYNs, and unsolicited reflector UDP (distinct
+    reflectors, bytes, mean packet size). A reflector counts as unsolicited when the destination
+    sent it nothing on a reflector port in this or the previous second.
+  - Per source: distinct (destination, port) SYN targets and how many it ACKed, distinct
+    destination hosts and ports.
+  - Distinct counts are exact sets capped at 4,096 members (they saturate there). HLL was not
+    used: a blake2b hash per packet costs about the whole 5% throughput budget. At most 65,536
+    entities per table per window; more are counted in `FastLane.overflow`, not tracked.
+- **Rules** (per second, fixed before any capture was replayed through them):
+  - `RULE_FAST_SYN_FLOOD`: ≥ 50 distinct SYN sources toward one destination, ≥ 80% of them with
+    no ACK in the window. HIGH, confidence 0.7.
+  - `RULE_FAST_UDP_REFLECTION`: ≥ 20 unsolicited reflectors, mean packet ≥ 400 B, ≥ 500 kB in the
+    window. HIGH, 0.7.
+  - `RULE_FAST_SCAN`: one source SYNs ≥ 20 distinct (host, port) targets and ACKs < 20% of them.
+    MEDIUM, 0.6.
+
+  These are stricter per second than the flow lane's per-window counts for scans, and fire on
+  fast floods only. Slower attacks are left to the flow lane. There is no shared-infrastructure
+  suppression in the fast lane.
+- **Provisional alerts.** A hit becomes an alert v2 with `provisional: true`,
+  `detection.lane = "fast lane, 1-s window"`, a 1-s window `flow_id` (§10), the top-5
+  contributing 5-tuples as Community IDs, `observability_state: null` (it is measured per flow,
+  and the fast lane has no flows), and no campaign. It goes through the same storage, hash chain
+  and SSE as every alert. `storage.save_alert` holds a lock, since two tasks now append to the
+  chain.
+- **Dedupe and confirmation.** One provisional alert per (class, entity) per 300 s of event time,
+  and none when the flow lane already alerted on that entity in the period. When the flow lane
+  later alerts on the same (class, entity) within 300 s, its alert carries `confirms: <alert_id of
+  the provisional one>`. The log is append-only, so the provisional row is never edited; the
+  dashboard draws it outlined until a confirming alert arrives. A provisional alert that is never
+  confirmed stays provisional.
+- **Cost and speed:** `docs/BENCHMARK.md` (fast lane).
+
 ## 10. Alert schema v2 (`sih26145.alert.v2`)
 
 ```json
@@ -283,6 +331,9 @@ replay clock the timer flushes on ingested event time, so late packets do not sp
   "campaign_id": null,
   "host_stage": null,
   "record_hash": null,
+  "provisional": false,
+  "confirms": null,
+  "contributing_flows": null,
   "detector": {"name": "exfiltration_detector", "type": "RULE", "version": "1.1.0"},
   "detection": {"rule_matches": ["RULE_EXFIL_EGRESS_BASELINE"], "ml_scores": [], "metrics": {}},
   "flow": {"src_ip": "…", "src_port": 0, "dst_ip": "…", "dst_port": 443, "protocol": "TCP",
@@ -292,8 +343,22 @@ replay clock the timer flushes on ingested event time, so late packets do not sp
 ```
 
 - `timestamp` is **event time** (end of the flow window), not processing time.
-- `flow_id` is the Community ID v1 hash of the 5-tuple, so an alert joins directly to a
-  Zeek `conn.log` row.
+- `flow_id` of a **per-flow alert** is the Community ID v1 hash of the 5-tuple, so the alert
+  joins directly to a Zeek `conn.log` row.
+- `flow_id` of an **aggregate alert** (one that names a destination or a source: DDoS, recon,
+  DGA, DNS tunnel, and every fast-lane alert) is a **window id**:
+  `win:<scope>:<ip>:<window start, integer epoch seconds>:<window length, s>`, for example
+  `win:dst:10.50.0.10:1790000040:60`. `scope` is `dst` or `src`. The flow lane uses the
+  FeatureStore's 60-s tumbling window that holds the triggering flow's last packet (its windowed
+  features cover that window and the previous one); the fast lane uses its 1-s window. An IPv6
+  address contains colons, so parse the id from both ends: two fields from the left, two from
+  the right.
+- `contributing_flows` (aggregate alerts only, else null): the Community IDs of the top
+  contributing flows, at most 5. For the flow lane, the triggering flow first, then the largest
+  by bytes toward (dst) or from (src) the entity in the current window. For the fast lane, the
+  5-tuples with the most packets in the window. `detection.entity` names the entity.
+- `provisional` (false unless fast lane) and `confirms` (the provisional alert a flow-lane alert
+  confirms, else null): §9a.
 - `evidence` lists only contract features. `baseline` is null when the detector has no
   learned baseline for that feature.
 - `observability_state` is computed from the flow at alert time.
@@ -358,8 +423,11 @@ origin; the smoke test fails if one does). Two full-height screens:
   - the return path is a dashed lane with a lock and "Bytes sent back: 0". That is true by
     construction: `tests/ingest/test_no_transmit.py` fails if the capture or ingest path gains a
     socket, a send or a writable `open`.
-- **Six PS threat tiles** (a)–(f): count (`stats/classes`), the latest alert's entity and first
-  evidence row at or past its reference, and what the detector looks at. "watching" at 0.
+- **Six PS threat tiles** (a)–(f): count of flow-lane alerts (`stats/classes`), the latest alert's
+  entity and first evidence row at or past its reference, and what the detector looks at.
+  "watching" at 0. A provisional fast-lane alert is drawn with a dashed outline (and an outlined
+  count while nothing confirms it) until the flow-lane alert that confirms it arrives; that alert
+  then says when the fast lane flagged it.
 - **KPI strip:** flows/s with a sparkline, Mbps, queue drops, reply-direction visibility and the
   alert log's chain state. The demo rate is labelled as such, next to the measured capacity.
 - **Campaign ribbon**, and the **replay banner** ("Replay of demo.pcap at N× real time · loop k").
@@ -452,7 +520,8 @@ origin; the smoke test fails if one does). Two full-height screens:
 |---|---|
 | dpkt ingest, flow tracker with bidirectional matching, observability_state | Implemented |
 | Zeek adapter | Not started |
-| Feature contract + tier enforcement test | Implemented (contract 1.3.0; the correlator is a declared consumer) |
+| Feature contract + tier enforcement test | Implemented (contract 1.4.0; the correlator and the fast lane are declared consumers) |
+| Fast lane (1-s packet counters, provisional (a)/(e) alerts confirmed by the flow lane) | Implemented (§9a) |
 | FeatureStore (tier 2) with sketches | Implemented; fed by the orchestrator for every flushed flow |
 | JA3 / JA4 / JA3S | Implemented (dpkt path); JA4 verified against the FoxIO published example |
 | Detector (f) with ratio / substitute branches | Implemented (ruleset 1.1.0) |

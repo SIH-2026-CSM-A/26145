@@ -32,6 +32,12 @@ async def test_demo_capture_story(monkeypatch):
     finally:
         await pipeline.storage.close()
     assert PS_CLASSES <= {a.threat_class for a in alerts}
+    # the fast lane flags the SYN flood and the sweep first; the flow lane confirms both
+    fast = [a for a in alerts if a.provisional]
+    assert sorted(a.detection["rule_matches"][0] for a in fast) == ["RULE_FAST_SCAN", "RULE_FAST_SYN_FLOOD"]
+    assert {a.confirms for a in alerts} >= {a.alert_id for a in fast}
+    alerts = [a for a in alerts if not a.provisional]
+    assert len(alerts) == 10
     host = [a for a in alerts if a.detection["correlation"]["host"] == "192.168.1.66"]
     assert len({a.campaign_id for a in host}) == 1
     assert list(dict.fromkeys(s["tactic_id"] for s in stages)) == ["TA0007", "TA0011", "TA0010"]
