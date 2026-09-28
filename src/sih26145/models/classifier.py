@@ -10,8 +10,10 @@ class LightGBMFlowClassifier:
     model_name = "lightgbm_flow_classifier"
     threat_class = "THREAT_ML_MALICIOUS_FLOW"
 
-    def __init__(self, path: str, threshold: float, features: List[str]):
-        self.booster = lightgbm.Booster(model_file=path)
+    def __init__(self, text: str, threshold: float, features: List[str]):
+        """`text`: the LightGBM text model from a verified bundle. LightGBM parses its own text
+        format (no pickle); the bundle's signature is checked before this runs."""
+        self.booster = lightgbm.Booster(model_str=text)
         self.threshold = threshold
         self.features = features
 

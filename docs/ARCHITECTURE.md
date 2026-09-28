@@ -522,6 +522,7 @@ origin; the smoke test fails if one does). Two full-height screens:
 | Zeek adapter | Not started |
 | Feature contract + tier enforcement test | Implemented (contract 1.4.0; the correlator and the fast lane are declared consumers) |
 | Fast lane (1-s packet counters, provisional (a)/(e) alerts confirmed by the flow lane) | Implemented (§9a) |
+| Signed offline update bundle (models, ruleset, contract; Ed25519; skops, no pickle) | Implemented (`docs/MODELS.md` §8) |
 | FeatureStore (tier 2) with sketches | Implemented; fed by the orchestrator for every flushed flow |
 | JA3 / JA4 / JA3S | Implemented (dpkt path); JA4 verified against the FoxIO published example |
 | Detector (f) with ratio / substitute branches | Implemented (ruleset 1.1.0) |

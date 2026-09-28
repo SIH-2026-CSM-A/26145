@@ -6,18 +6,21 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "aiosqlite>=0.22.1",
+    "cryptography>=50.0.1",
     "dpkt>=1.9.8",
     "fastapi>=0.141.1",
     "lightgbm>=4.6",
     "numpy>=2.4.6",
     "pydantic>=2.13.5",
     "scikit-learn>=1.9.1",
+    "skops>=0.16.0",
     "sse-starlette>=3.4.11",
     "uvicorn>=0.53.0",
 ]
 
 [project.scripts]
 sih26145 = "sih26145.cli:main"
+saakshi = "sih26145.cli:main"
 
 [build-system]
 requires = ["hatchling"]

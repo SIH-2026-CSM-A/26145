@@ -11,7 +11,7 @@ this code is marked as such.
 |---|---|---|
 | Static scan of the capture path | `ingest/`, `flow/`, `features/`, `detectors/` and `streaming.py` contain no socket creation, no `send*`/`connect`/`bind`/`listen`, no network-client import, and open files read-only | `tests/ingest/test_no_transmit.py` (with a falsification test for each pattern) |
 | Runtime audit hook during a replay | A full replay of `demo/demo.pcap` through the real pipeline (detectors, models, correlator, SQLite chain), in a fresh process with a CPython audit hook, creates no `AF_INET`, `AF_INET6` or `AF_PACKET` socket and makes no `connect`/`bind`/`sendto`/`sendmsg` on one. Libraries count too, not only our code. The only socket is asyncio's local `AF_UNIX` self-pipe | `tests/ingest/test_no_outbound_socket.py`; a second test injects one UDP socket and checks that the hook reports it |
-| No runtime download | Models, dashboard and the demo capture are baked into the image. Nothing is fetched at start or while running | `DEPLOY.md`; models are hash-checked against `manifest.json` on load |
+| No runtime download | Models, dashboard and the demo capture are baked into the image. Nothing is fetched at start or while running. Updates arrive as a signed offline bundle, verified before anything in it is loaded | `DEPLOY.md`; `docs/MODELS.md` §8 |
 
 ## 2. Container
 

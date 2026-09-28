@@ -72,8 +72,8 @@
     "fp_at_threshold": 7
   },
   "iforest": {
-    "file": "iforest.joblib",
-    "sha256": "1caf07b2b06a9bd9b5e840be8b4022d3089d51f22638f5b8900e47b23e807823",
+    "file": "iforest.skops",
+    "sha256": "a8972296f6c0d0d9075a62c20c4263f3e5c246e84ebf432901ab23b31d3f48a4",
     "params": {
       "n_estimators": 100,
       "max_samples": 256,
@@ -1090,7 +1090,12 @@
     "n_benign": 83035,
     "budget_per_10k": 1.0,
     "allowed_fp": 8,
-    "fp_at_threshold": 7
+    "fp_at_threshold": 7,
+    "converted_from": {
+      "file": "iforest.joblib",
+      "sha256": "1caf07b2b06a9bd9b5e840be8b4022d3089d51f22638f5b8900e47b23e807823",
+      "note": "the same fitted model re-serialised with skops (2026-09-28); score_samples identical on 20,000 random rows"
+    }
   },
   "training_files": {
     "ctu13-s1.labelled.csv.gz": "90b0a78bf4f30283f14eba57ce22fcd0df636a5fcbf0cf196015f3060bb78655",
@@ -1105,7 +1110,8 @@
     "lightgbm": "4.7.0",
     "scikit-learn": "1.9.1",
     "numpy": "2.5.3",
-    "joblib": "1.6.0"
+    "joblib": "1.6.0",
+    "skops": "0.16.0"
   },
   "python": "3.13.14"
 }

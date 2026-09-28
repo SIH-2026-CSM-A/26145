@@ -1,41 +1,32 @@
 """The trained flow models, loaded offline from versioned artefacts and scored in batches."""
 
-import hashlib
 import json
-import os
 from typing import Dict, List, Optional
 
 import numpy as np
 
+from sih26145 import bundle
 from sih26145.models.anomaly import IsolationForestFlowModel
 from sih26145.models.classifier import LightGBMFlowClassifier
 from sih26145.models.features import ML_FEATURES, ml_matrix
 from sih26145.models.schemas import ML_MODEL_VERSION, MLPrediction
 
-ARTIFACTS = os.path.join(os.path.dirname(__file__), "artifacts")
 IF_EVIDENCE_NOTE = "evidence is LightGBM pred_contrib: it explains the supervised model's view, not the IsolationForest"
-
-
-def _verified(directory: str, entry: Dict) -> str:
-    path = os.path.join(directory, entry["file"])
-    with open(path, "rb") as fh:
-        digest = hashlib.sha256(fh.read()).hexdigest()
-    if digest != entry["sha256"]:
-        raise ValueError(f"{path}: sha256 {digest} does not match the manifest")
-    return path
 
 
 class MLModelSuite:
     """LightGBM + IsolationForest over the ML_FEATURES of each flow's model row."""
 
-    def __init__(self, artifacts: Optional[str] = None):
-        directory = artifacts or ARTIFACTS
-        with open(os.path.join(directory, "manifest.json")) as fh:
-            m = json.load(fh)
+    def __init__(self, files: Optional[Dict[str, bytes]] = None):
+        """`files`: the members of a verified bundle (bundle.load_verified). Default: the
+        committed bundle, verified against the pinned key. Models load from those bytes only."""
+        files = files if files is not None else bundle.load_verified()
+        m = json.loads(files["models/manifest.json"])
         if m["version"] != ML_MODEL_VERSION or m["features"] != ML_FEATURES:
             raise ValueError("model artefacts do not match ML_MODEL_VERSION / ML_FEATURES; retrain")
-        self.classifier = LightGBMFlowClassifier(_verified(directory, m["lgbm"]), m["lgbm"]["threshold"], m["features"])
-        self.anomaly = IsolationForestFlowModel(_verified(directory, m["iforest"]), m["iforest"]["threshold"],
+        self.classifier = LightGBMFlowClassifier(files[f"models/{m['lgbm']['file']}"].decode(),
+                                                 m["lgbm"]["threshold"], m["features"])
+        self.anomaly = IsolationForestFlowModel(files[f"models/{m['iforest']['file']}"], m["iforest"]["threshold"],
                                                 m["iforest"]["benign_score_quantiles"])
         # whether a model's flag may raise an alert with no rule hit (docs/MODELS.md)
         self.alone = {"lgbm": m["lgbm"]["alerts_alone"], "iforest": m["iforest"]["alerts_alone"]}

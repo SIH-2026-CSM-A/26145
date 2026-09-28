@@ -1,15 +1,14 @@
-"""The trained flow models load offline from verified artefacts and score in batches."""
+"""The trained flow models load offline from the verified bundle and score in batches."""
 
 import json
 import math
-import shutil
 
 import numpy as np
 import pytest
 
 from sih26145.models import MLModelSuite
 from sih26145.models.features import ML_FEATURES, dst_port_class, ml_matrix
-from sih26145.models.suite import ARTIFACTS
+from sih26145 import bundle
 
 
 def row(**overrides):
@@ -26,7 +25,7 @@ def suite():
 
 
 def test_manifest_matches_the_code(suite):
-    manifest = json.load(open(f"{ARTIFACTS}/manifest.json"))
+    manifest = json.loads(bundle.load_verified()["models/manifest.json"])
     assert manifest["features"] == ML_FEATURES
     assert manifest["lgbm"]["params"]["num_threads"] == 1 and manifest["iforest"]["params"]["n_jobs"] == 1
     assert suite.classifier.threshold == manifest["lgbm"]["threshold"]
@@ -51,9 +50,8 @@ def test_port_class_is_coarse():
     assert dst_port_class(0, "ICMP") == 0.0
 
 
-def test_tampered_artefact_is_refused(tmp_path):
-    shutil.copytree(ARTIFACTS, tmp_path / "a")
-    with open(tmp_path / "a" / "lgbm.txt", "a") as fh:
-        fh.write("\n")
-    with pytest.raises(ValueError, match="sha256"):
-        MLModelSuite(str(tmp_path / "a"))
+def test_isolation_forest_loads_through_skops_not_pickle(suite):
+    import sklearn.ensemble
+    assert isinstance(suite.anomaly.model, sklearn.ensemble.IsolationForest)
+    manifest = json.loads(bundle.load_verified()["models/manifest.json"])
+    assert manifest["iforest"]["file"].endswith(".skops")

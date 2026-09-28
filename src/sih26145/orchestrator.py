@@ -3,6 +3,7 @@
 import asyncio
 from typing import Callable, List, Optional
 
+from sih26145 import bundle
 from sih26145.alerts.aggregator import EvidenceAggregator, WindowTopFlows, provisional_alert
 from sih26145.alerts.models import Alert
 from sih26145.correlate import Correlator, tactic
@@ -35,11 +36,16 @@ class ThreatDetectionPipeline:
 
     def __init__(self, db_path: Optional[str] = None, storage: Optional[AlertStorage] = None,
                  publish: Optional[Callable[[dict], None]] = None,
-                 feature_sink: Optional[Callable[[FlowRecord, dict], None]] = None, ml: bool = True):
+                 feature_sink: Optional[Callable[[FlowRecord, dict], None]] = None, ml: bool = True,
+                 bundle_path: Optional[str] = None, bundle_pubkey: Optional[str] = None):
+        # Signed update bundle (docs/MODELS.md §8): signature and hashes first, then the code's
+        # thresholds, contract and lists must equal the signed ones; models load from its bytes.
+        files = bundle.load_verified(bundle_path, pubkey=bundle_pubkey)
+        bundle.check_code_matches(files)
         self.flow_tracker = FlowTracker(max_flows=10000, idle_timeout=15.0, active_timeout=60.0)
         self.feature_extractor = FeatureExtractor()
         self.rule_suite = RuleDetectorSuite()
-        self.ml_suite = MLModelSuite() if ml else None
+        self.ml_suite = MLModelSuite(files) if ml else None
         self.feature_sink = feature_sink
         self.storage = storage or AlertStorage(db_path)
         self.publish = publish

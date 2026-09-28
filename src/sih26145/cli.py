@@ -46,7 +46,43 @@ def main():
     export_parser.add_argument("--db", required=True, help="SQLite alert database")
     export_parser.add_argument("--out", required=True, help="Output directory")
 
+    bundle_parser = subparsers.add_parser("bundle", help="Signed offline update bundles (models, ruleset, contract)")
+    bsub = bundle_parser.add_subparsers(dest="bundle_cmd", required=True)
+    kg = bsub.add_parser("keygen", help="New Ed25519 signing key (private key stays outside the repository)")
+    kg.add_argument("--private", required=True, help="Where to write the private key (PEM, mode 0600)")
+    kg.add_argument("--public", help="Also write the public key here (e.g. src/sih26145/config/bundle_ed25519.pub)")
+    bb = bsub.add_parser("build", help="Pack models/artifacts, the ruleset, lists and contract into a tar")
+    bb.add_argument("--out", required=True)
+    bb.add_argument("--artifacts", help="Model artefact directory (default: the package's models/artifacts)")
+    bs = bsub.add_parser("sign", help="Write BUNDLE.sig with a private key")
+    bs.add_argument("bundle")
+    bs.add_argument("--key", required=True)
+    bv = bsub.add_parser("verify", help="Check a bundle's signature and hashes against the pinned key")
+    bv.add_argument("bundle")
+    bv.add_argument("--pubkey", help="Public key file (default: the pinned config/bundle_ed25519.pub)")
+
     args = parser.parse_args()
+    if args.command == "bundle":
+        from sih26145 import bundle
+        try:
+            if args.bundle_cmd == "keygen":
+                print(f"public key (pin in config/bundle_ed25519.pub): {bundle.keygen(args.private, args.public)}")
+            elif args.bundle_cmd == "build":
+                m = bundle.build(args.out, args.artifacts)
+                print(f"built {args.out}: {len(m['files'])} files, models {m['model_version']}, "
+                      f"rules {m['ruleset_version']}, contract {m['contract_version']} (unsigned: run bundle sign)")
+            elif args.bundle_cmd == "sign":
+                print(f"signed: {bundle.sign(args.bundle, args.key)}")
+            else:
+                pub = open(args.pubkey).read() if args.pubkey else None
+                files = bundle.load_verified(args.bundle, pubkey=pub)
+                bundle.check_code_matches(files)
+                print(f"verified: {args.bundle}, {len(files) - 1} files, signature and every sha256 match; "
+                      "ruleset, contract and lists match this code")
+        except (bundle.BundleError, FileExistsError, FileNotFoundError) as e:
+            print(f"refused: {e}")
+            sys.exit(1)
+        return
     if args.command in ("verify-log", "export"):
         from sih26145.storage import chain
         if args.command == "verify-log":

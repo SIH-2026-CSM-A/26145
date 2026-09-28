@@ -19,13 +19,12 @@ import os
 import platform
 from importlib.metadata import version
 
-import joblib
 import lightgbm
 import numpy as np
 from sklearn.ensemble import IsolationForest
 from sklearn.model_selection import KFold
 
-from sih26145.models.anomaly import impute
+from sih26145.models.anomaly import dump_skops, impute
 from sih26145.models.schemas import ML_MODEL_VERSION
 from sih26145.training.dataset import load
 from sih26145.training.evaluate import (
@@ -96,14 +95,15 @@ def sha256(path):
 
 def save(ds, th, files, if_benign_oof, lgbm_model, if_model):
     os.makedirs(ARTIFACTS, exist_ok=True)
-    lgbm_path, if_path = os.path.join(ARTIFACTS, "lgbm.txt"), os.path.join(ARTIFACTS, "iforest.joblib")
+    lgbm_path, if_path = os.path.join(ARTIFACTS, "lgbm.txt"), os.path.join(ARTIFACTS, "iforest.skops")
     lgbm_model.booster_.save_model(lgbm_path)
-    joblib.dump(if_model, if_path)
+    with open(if_path, "wb") as fh:  # skops, not pickle (docs/MODELS.md §8); fixed zip timestamps
+        fh.write(dump_skops(if_model))
     manifest = {
         "version": ML_MODEL_VERSION, "features": ds.features,
         "lgbm": {"file": "lgbm.txt", "sha256": sha256(lgbm_path), "params": LGBM_PARAMS, "alerts_alone": True,
                  **th["lgbm"]},
-        "iforest": {"file": "iforest.joblib", "sha256": sha256(if_path), "params": IF_PARAMS,
+        "iforest": {"file": "iforest.skops", "sha256": sha256(if_path), "params": IF_PARAMS,
                     "nan_sentinel": -1.0, "score": "negated score_samples (higher = more anomalous)",
                     "alerts_alone": IF_ALERTS_ALONE,
                     # confidence = percentile of a score among out-of-fold benign scores
@@ -111,7 +111,7 @@ def save(ds, th, files, if_benign_oof, lgbm_model, if_model):
                     **th["iforest"]},
         "training_files": {os.path.basename(f): sha256(f) for f in files},
         "training_rows": int(len(ds.y)), "training_positives": int(ds.y.sum()),
-        "libs": {p: version(p) for p in ("lightgbm", "scikit-learn", "numpy", "joblib")},
+        "libs": {p: version(p) for p in ("lightgbm", "scikit-learn", "numpy", "skops")},
         "python": platform.python_version(),
     }
     with open(os.path.join(ARTIFACTS, "manifest.json"), "w") as fh:

@@ -26,7 +26,7 @@ measures the base rate.
 | Output | Probability of the malicious class. The score is **not calibrated for a new link** (§4.3) |
 | Target | 1 = CTU-13 `From-Botnet` flow, 0 = `From-Normal` flow. Each malicious row carries its scenario's class name (§2.2) for per-class reporting; the model itself is binary |
 | Algorithm | LightGBM 4.7.0 `LGBMClassifier`: 300 trees, learning rate 0.05, 31 leaves, min 50 rows per leaf, `num_threads=1`, deterministic, seed 42. Fixed before validation; no tuning |
-| Artefact | `src/sih26145/models/artifacts/lgbm.txt` (LightGBM text model), hash-checked against `manifest.json` on load. Nothing is downloaded at runtime |
+| Artefact | `models/lgbm.txt` in the signed bundle `src/sih26145/models/bundle/saakshi-models.tar` (§8), built from `src/sih26145/models/artifacts/lgbm.txt`. LightGBM text model, parsed by LightGBM's own text loader (`Booster(model_str=…)`, no pickle) only after the bundle's signature and hashes verify. Nothing is downloaded at runtime |
 | Threshold | Probability > **0.99999974** (log-odds 15.15). This is the lowest threshold that keeps the pooled out-of-fold benign flows within the **alert budget of 1 ML-only false positive per 10,000 benign flows**: 83,035 benign flows allow 8, and 7 score above it. The budget was set before training, so that an ML-only alert stream stays reviewable on a busy link; it was not chosen for best F1 |
 | Evidence | Every ML-raised or ML-agreeing alert lists the flow's top 5 features by \|`pred_contrib`\| (LightGBM's built-in TreeSHAP, log-odds units), each with its value |
 | Severity | ML-only alerts are capped at MEDIUM. Agreement with a rule raises the rule alert one level |
@@ -46,7 +46,7 @@ decided it; accuracy did not come into the choice.
 | Training data | Benign rows only (`From-Normal`, §2) |
 | Output | Anomaly score = −`score_samples` (higher = more unusual). Alert confidence is the score's percentile among out-of-fold benign scores, **not a probability** |
 | Algorithm | scikit-learn 1.9.1 `IsolationForest`: 100 trees, 256 samples per tree, `n_jobs=1`, seed 42 |
-| Artefact | `src/sih26145/models/artifacts/iforest.joblib`, hash-checked on load |
+| Artefact | `models/iforest.skops` in the signed bundle (§8), built from `src/sih26145/models/artifacts/iforest.skops`. Loaded with `skops.io.loads` and an explicit trusted-type list (`sklearn.tree._tree.Tree`, the only type outside skops' defaults), not pickle, and only after the bundle verifies |
 | Threshold | Anomaly score > **0.6514**, under the same 1-per-10,000 budget (7 of 83,035 out-of-fold benign flows above it) |
 | Alerts | **Corroborates only**: it never raises an alert alone (manifest `alerts_alone: false`). A flagged flow that also has a rule hit gets the forest's score attached, and the rule alert goes up one severity level. Why: §4.5 |
 | Evidence | LightGBM `pred_contrib` for the same flow. The alert says so (`note`): it explains the supervised model's view, not the forest's |
@@ -392,6 +392,7 @@ uv run python scripts/build_dataset.py generated --outdir $F                    
 # 3. Validate, fit, write artefacts + docs/model_metrics.json (deterministic: same files every run)
 uv run python scripts/train_models.py $F/ctu13-s*.labelled.csv.gz \
   --holdout $F/gen-*.labelled.csv.gz --report docs/model_metrics.json
+#    then rebuild and re-sign the bundle (§8)
 
 # 4. The random-split falsification (§4.4)
 uv run python scripts/train_models.py $F/ctu13-s*.labelled.csv.gz --split random \
@@ -410,6 +411,56 @@ uv run pytest -q
 | `logo_folds` yields random row folds | `test_validation_folds_never_share_a_scenario`. The metrics change is §4.4 |
 | ML-only severity cap removed (`_cap_ml_only` bypassed) | `test_ml_only_alert_is_capped_at_medium[0.8]`, `[0.99]`, `test_evidence_aggregation_ml_only` |
 | pcapng reader reports captured length | `test_truncated_pcapng_blocks_report_wire_length` |
+
+## 8. Signed update bundles, and no unsigned deserialisation
+
+Models, rule thresholds and the feature contract reach the sensor as one **signed offline
+bundle** (`src/sih26145/bundle.py`, CLI `saakshi bundle keygen|build|sign|verify`; `sih26145` is
+the same command).
+
+- **Contents** (an uncompressed, deterministic tar):
+  - `MANIFEST.json`: format, model/ruleset/contract versions, and the SHA-256 of every other
+    member;
+  - `models/manifest.json`, `models/lgbm.txt`, `models/iforest.skops`;
+  - `ruleset.json`: every rule-detector and fast-lane threshold, generated from the code;
+  - `lists/`: the default poller allowlist and known-bad JA4 list;
+  - `feature_contract.toml`.
+- **Signature:** Ed25519 over the tar's exact bytes, in `<bundle>.sig`. The private key is made by
+  `saakshi bundle keygen` and kept outside the repository (the demo's is in
+  `~/.config/saakshi/`, mode 0600). The public key is pinned in
+  `src/sih26145/config/bundle_ed25519.pub`. A test fails if any tracked file holds a PEM private
+  key.
+- **Order of checks when the pipeline starts** (`ThreatDetectionPipeline`, every mode):
+  1. the `.sig` exists, or the bundle is refused as unsigned;
+  2. the signature verifies with the pinned key over the file's bytes. Nothing inside the tar has
+     been parsed yet;
+  3. the tar is read in memory (nothing is extracted to disk). Its members must equal
+     `MANIFEST.json`'s list, and every SHA-256 must match;
+  4. the thresholds in the code, the packaged contract and the default lists must equal the
+     signed copies;
+  5. only then are the models deserialised, from the verified bytes.
+- **Deserialisers.**
+  - The IsolationForest is stored with **skops**, not joblib/pickle. The same fitted model was
+    re-serialised on 2026-09-28; its `score_samples` output is identical on 20,000 random rows.
+    skops output normally differs run to run (member names are memory addresses, and sklearn's
+    tree arrays carry uninitialised padding bytes). `models/anomaly.dump_skops` renumbers and
+    zeroes them, so `train_models.py` still writes the same bytes every run.
+  - LightGBM loads its own text format; no pickle is involved.
+  - joblib is no longer used anywhere in the load path.
+- **Tests** (`tests/models/test_bundle.py`). Each refusal test also asserts that neither
+  `skops.io.loads` nor `lightgbm.Booster` was reached.
+  - A tampered model file is refused: the signature fails.
+  - A tampered file in a re-signed tar is refused on its hash.
+  - A bundle checked against a wrong key is refused.
+  - An unsigned bundle is refused.
+  - A threshold changed in code without a new bundle is refused.
+  - The committed bundle verifies, the build is byte-reproducible, and the valid bundle gives
+    the demo its same 10 flow-lane alerts.
+- **Changing a threshold, the contract, a default list or a model** now needs a rebuilt,
+  re-signed bundle:
+  `saakshi bundle build --out src/sih26145/models/bundle/saakshi-models.tar && saakshi bundle sign src/sih26145/models/bundle/saakshi-models.tar --key ~/.config/saakshi/bundle-ed25519.pem`.
+  Operator list overrides (`SIH26145_POLLER_ALLOWLIST`, `SIH26145_JA4_KNOWN_BAD`) are local files
+  outside the bundle, as before.
 
 ## 7. Engineered features (generated from `feature_contract.toml`)
 

@@ -35,3 +35,7 @@ Read AGENTS.md (standing rules), docs/ARCHITECTURE.md, docs/AUDIT.md, TODO.md fi
 - Port 8000 is taken by something else on this machine: use `PORT=18001 scripts/demo.sh`,
   `SIH_PORT=18000 docker compose up`. Docker Desktop must be started (Windows app) first.
 - The API is read-only by design (public demo, no auth): tests/api/test_readonly_surface.py.
+- Models, thresholds, contract and default lists ship in the signed bundle
+  `src/sih26145/models/bundle/saakshi-models.tar(.sig)`; the pipeline refuses to start if the code differs.
+  After changing any of them: `saakshi bundle build --out <that tar>` then `saakshi bundle sign <tar> --key
+  ~/.config/saakshi/bundle-ed25519.pem` (key never in the repo; pubkey pinned in `config/bundle_ed25519.pub`).
