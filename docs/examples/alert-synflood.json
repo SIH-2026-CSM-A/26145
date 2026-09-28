@@ -1,0 +1,76 @@
+{
+    "$schema": "https://sih26145.ntro.gov.in/schemas/alert.v2.json",
+    "version": "2.0",
+    "alert_id": "urn:uuid:1877a6fd-0757-4a13-b913-610b121c8a47",
+    "timestamp": "2026-09-21T14:24:04.633688+00:00",
+    "flow_id": "1:skncIG8BerCBdkd1h/+2YOHpYxc=",
+    "threat_class": "THREAT_DDOS_VOLUME",
+    "confidence": 0.9,
+    "severity": "CRITICAL",
+    "evidence": [
+        {
+            "feature": "dst_distinct_srcs_w",
+            "value": 200.44889847854245,
+            "baseline": 200,
+            "baseline_source": "rule_threshold"
+        },
+        {
+            "feature": "dst_src_ip_entropy_w",
+            "value": 6.470950066927685,
+            "baseline": 5.0,
+            "baseline_source": "rule_threshold"
+        },
+        {
+            "feature": "dst_syn_only_ratio_w",
+            "value": 1.0,
+            "baseline": 0.8,
+            "baseline_source": "rule_threshold"
+        }
+    ],
+    "observability_state": "forward_only",
+    "substitutions": [],
+    "contract_version": "1.3.0",
+    "model_version": "rules-2.1.0",
+    "campaign_id": "camp-86ff9d5f57a4",
+    "host_stage": "TA0040",
+    "record_hash": "c56d8871fdf1d8811c9c4e3c7910b85d11d54b2a66da9e84fab2fadccf0600e6",
+    "detector": {
+        "name": "ddos_volume_detector",
+        "type": "RULE",
+        "version": "2.1.0"
+    },
+    "detection": {
+        "rule_matches": [
+            "RULE_DDOS_SYN_FLOOD"
+        ],
+        "ml_scores": [],
+        "metrics": {
+            "dst_distinct_srcs_w": 200.44889847854245,
+            "dst_src_ip_entropy_w": 6.470950066927685,
+            "dst_syn_only_ratio_w": 1.0
+        },
+        "correlation": {
+            "campaign_id": "camp-86ff9d5f57a4",
+            "host": "10.50.0.10",
+            "tactic": "Impact",
+            "joined_on": [],
+            "not_merged": [],
+            "refused_pivots": []
+        }
+    },
+    "flow": {
+        "src_ip": "208.194.249.20",
+        "dst_ip": "10.50.0.10",
+        "dst_port": 80,
+        "protocol": "TCP",
+        "window_start": "2026-09-21T14:24:03.633688+00:00",
+        "window_end": "2026-09-21T14:24:04.633688+00:00",
+        "src_port": 1230
+    },
+    "feature_summary": {
+        "total_packets": 2,
+        "total_bytes": 108,
+        "pps": 2.0,
+        "bps": 108.0
+    }
+}

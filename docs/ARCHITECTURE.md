@@ -12,7 +12,7 @@ unidirectional IP traffic.
 
 | ID | Constraint | Where it is enforced |
 |---|---|---|
-| RO | Read-only ingest, no return path | §2, §14. No transmit socket anywhere in `src/`; `tests/ingest/test_security_boundary.py` |
+| RO | Read-only ingest, no return path | §2, §14, `docs/ISOLATION.md`. No transmit socket on the capture path (`tests/ingest/test_no_transmit.py`); none opened at runtime during a replay (`tests/ingest/test_no_outbound_socket.py`) |
 | ND | No payload decryption | §6 contract: decryption-dependent features are `unavailable` |
 | SL | Streaming with bounded latency | §9 bounded queue, idle flush |
 | TP | Stated and demonstrated throughput | §13 — flows/sec and Mbps, measured, hardware stated |

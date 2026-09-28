@@ -57,7 +57,7 @@ decided it; accuracy did not come into the choice.
   PS (c) DGA/tunnelling or (d) encrypted-session malware. The models cannot see those signals.
 - **Not a verdict on a host.** A score is about one flow. The training labels are host-based:
   every flow an infected host started is "malicious", including its ordinary lookups and updates.
-- **Not a calibrated probability on a new network.** The training mix is 28% malicious. A live
+- **Not a calibrated probability on a new network.** The training mix is 27.6% malicious (31,665 of 114,700 flows). A live
   link's base rate is far lower, so read the score as a ranking and use the threshold.
 - **Not evidence of absence.** Recall at the budget is well below 1 (§4). A quiet model on a flow
   says little.
@@ -197,12 +197,44 @@ Per class, the malicious flows of each scenario (the recall columns above) are:
 **Reading it honestly:**
 - LightGBM *ranks* held-out scenarios well: PR-AUC 0.74–1.00 (for s6, every malicious flow
   outranks every benign one).
-- At the 1-per-10k budget, cross-scenario *recall is poor*: 28% pooled, and nearly all of it
+- At the 1-per-10k budget, cross-scenario *recall is poor*: 28% pooled (8,922 of 31,665 malicious flows, §4.1a), and nearly all of it
   from s1, the largest scenario. The threshold is set by the most botnet-like benign flows, all
   seven of them from s1, and the malicious flows of other families mostly score just below it.
 - A deployment that wants more recall must accept a larger budget: the ranking is there, the
   margin is not.
 - The IsolationForest ranks worse (PR-AUC 0.22–0.87) and catches almost nothing at the budget.
+
+### 4.1a What "28%" means
+
+"28%" in this document is **LightGBM's recall at the alert budget, pooled over the
+leave-one-scenario-out folds**. Precisely:
+
+- **Unit: flows**, not hosts. A malicious flow is a flow an infected host started (`From-Botnet`,
+  §2.2). Recall counts how many of those flows score above the threshold.
+- **Scores:** each scenario's flows are scored by the model trained on the other four (§3). No
+  flow is scored by a model that saw its scenario.
+- **Threshold rule:** one threshold for all folds, set on the pooled out-of-fold benign scores so
+  that at most 1 benign flow per 10,000 scores above it. With 83,035 benign flows that allows
+  ⌊83,035 / 10,000⌋ = 8. The threshold 0.99999974 is the lowest that respects it, and leaves 7
+  above it.
+- **Numerator / denominator,** printed from `docs/model_metrics.json` by
+  `uv run python scripts/recall_counts.py` (not re-derived by hand):
+
+| Held-out part | Unit | Malicious flows caught (TP) / malicious flows | Recall | Benign flows above threshold (FP) / benign flows | FP per 10k benign | PR-AUC |
+|---|---|---|---|---|---|---|
+| pooled, all five | flows | 8,922 / 31,665 | 0.2818 | 7 / 83,035 | 0.84 | 0.9704 |
+| ctu13-s1 | flows | 8,860 / 22,928 | 0.3864 | 7 / 49,606 | 1.41 | 0.9971 |
+| ctu13-s11 | flows | 0 / 28 | 0.0000 | 0 / 1,016 | 0.0 | 0.8784 |
+| ctu13-s12 | flows | 18 / 3,137 | 0.0057 | 0 / 13,024 | 0.0 | 0.7389 |
+| ctu13-s5 | flows | 44 / 931 | 0.0473 | 0 / 7,062 | 0.0 | 0.9998 |
+| ctu13-s6 | flows | 0 / 4,641 | 0.0000 | 0 / 12,327 | 0.0 | 1.0000 |
+
+So 28% is 8,922 / 31,665, and 8,860 of those 8,922 flows are s1's. The per-scenario recall is
+0–39%. PR-AUC (right column) measures the ranking over all thresholds; recall is one point on it,
+at the budget.
+
+**A different 28%:** 27.6% of the training flows are malicious (31,665 of 114,700; §2.2). That is
+the base rate, not a detection figure. §1.3 and §5 now say 27.6%.
 
 ### 4.2 Generated attack captures (held out, never trained on)
 
@@ -326,7 +358,7 @@ Earlier variants, measured this session and recorded for completeness:
   ordinary DNS and web lookups. Precision against truly malicious *flows* is lower than the
   table suggests; recall on the botnet's benign-looking flows is not expected.
 - **Header-only training data:** DNS, TLS and payload features are absent by construction (see the note at the top).
-- **Base rate:** training is 28% malicious. On a live link the share is far lower, so precision
+- **Base rate:** training is 27.6% malicious. On a live link the share is far lower, so precision
   at the same threshold will be lower than measured, and the raw score is not a probability
   (§4.3).
 - **Tier-2 features depend on the replay:** at high paced-replay speeds, idle flows reach the

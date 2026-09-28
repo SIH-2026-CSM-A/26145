@@ -1,0 +1,72 @@
+{
+    "$schema": "https://sih26145.ntro.gov.in/schemas/alert.v2.json",
+    "version": "2.0",
+    "alert_id": "urn:uuid:04f95661-2219-426e-a4b2-c3493c6d6209",
+    "timestamp": "2026-09-21T14:23:21.998000+00:00",
+    "flow_id": "1:VUddkqzJtFaTnmbGkMUmAlWNjsg=",
+    "threat_class": "THREAT_EXFILTRATION",
+    "confidence": 0.85,
+    "severity": "HIGH",
+    "evidence": [
+        {
+            "feature": "outbound_inbound_byte_ratio",
+            "value": 280.3703703703704,
+            "baseline": 50.0,
+            "baseline_source": "rule_threshold"
+        },
+        {
+            "feature": "egress_bytes",
+            "value": 1211200,
+            "baseline": null,
+            "baseline_source": null
+        }
+    ],
+    "observability_state": "bidirectional",
+    "substitutions": [],
+    "contract_version": "1.3.0",
+    "model_version": "rules-2.1.0",
+    "campaign_id": "camp-9d56ec36d540",
+    "host_stage": "TA0010",
+    "record_hash": "c17dd4dac8790601ec67cd4e22074a9fba8e52c61a6acae0f80c6411ab753454",
+    "detector": {
+        "name": "exfiltration_detector",
+        "type": "RULE",
+        "version": "2.1.0"
+    },
+    "detection": {
+        "rule_matches": [
+            "RULE_EXFIL_OUTBOUND_RATIO"
+        ],
+        "ml_scores": [],
+        "metrics": {
+            "outbound_inbound_byte_ratio": 280.3703703703704,
+            "egress_bytes": 1211200
+        },
+        "correlation": {
+            "campaign_id": "camp-9d56ec36d540",
+            "host": "192.168.1.66",
+            "tactic": "Exfiltration",
+            "joined_on": [
+                "host:192.168.1.66",
+                "port:TCP/1"
+            ],
+            "not_merged": [],
+            "refused_pivots": []
+        }
+    },
+    "flow": {
+        "src_ip": "192.168.1.66",
+        "dst_ip": "203.0.113.99",
+        "dst_port": 443,
+        "protocol": "TCP",
+        "window_start": "2026-09-21T14:23:20+00:00",
+        "window_end": "2026-09-21T14:23:21.998000+00:00",
+        "src_port": 51515
+    },
+    "feature_summary": {
+        "total_packets": 880,
+        "total_bytes": 1215520,
+        "pps": 440.44,
+        "bps": 608368.4
+    }
+}

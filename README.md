@@ -49,7 +49,7 @@ What happens:
 ## 🔒 Passive Tap & Data-Diode Architecture
 
 The system operates strictly under **PASSIVE READ-ONLY MONITORING** semantics:
-- **No Transmit Sockets**: Ingestion interfaces operate strictly in promiscuous receive mode (`AF_PACKET` / `pcap`).
+- **No Transmit Sockets**: the sensor reads capture files (pcap/pcapng) and opens no network socket during a replay; a static scan and a runtime audit-hook test enforce it. How "nothing goes back" is enforced, and what is only a deployment requirement: [`docs/ISOLATION.md`](docs/ISOLATION.md).
 - **No Active Mitigation**: Zero TCP RST generation, IP blocking, or firewall rule modification.
 - **No Payload Decryption**: Operates 100% on observable packet headers, flow metadata, timing, and protocol fields.
 
@@ -160,6 +160,8 @@ Open `http://localhost:3000` in your browser to inspect live traffic metrics, th
 - `GET /api/v1/metrics`: Active flow counts, PPS, BPS, and total alert counts.
 - `GET /api/v1/alerts`: Query persisted threat alerts with filtering (`threat_class`, `severity`).
 - `GET /api/v1/stream/alerts`: Server-Sent Events (SSE) live event stream pushing alerts to client dashboards.
+
+Example alerts, exactly as `GET /api/v1/alerts/{alert_id}` returned them for `demo/demo.pcap` (pretty-printed, content unchanged): a per-flow exfiltration alert, [`docs/examples/alert-exfil.json`](docs/examples/alert-exfil.json), and an aggregate SYN-flood alert, [`docs/examples/alert-synflood.json`](docs/examples/alert-synflood.json). Exporting the log for one-way transfer (bundle files, `verify-log`, the BSA 2023 s.63 data sheet): [`docs/EXPORT.md`](docs/EXPORT.md).
 
 ---
 
