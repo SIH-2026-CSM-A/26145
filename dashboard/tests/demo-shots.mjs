@@ -3,11 +3,12 @@
 // stays up while stills 2-5 are taken:
 //   SIH26145_INTERNAL_CIDRS=147.32.0.0/16,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12 \
 //     uv run sih26145 serve demo/demo.pcap --speed 5 --loop --pause 600 --port 18001 &
-//   node tests/demo-shots.mjs http://127.0.0.1:18001 OUT_DIR
-// Writes s6-01 .. s6-06 (s6-07, the verify-log terminal, is scripts/render_verify_log.py).
+//   node tests/demo-shots.mjs http://127.0.0.1:18001 OUT_DIR [PREFIX]
+// Writes PREFIX-00 .. PREFIX-06 (default s7; the verify-log terminal is scripts/render_verify_log.py).
+// PREFIX-00 is the flood's provisional fast-lane alert, outlined on tile (a) before it is confirmed.
 import { chromium } from 'playwright';
 
-const [url, dir] = process.argv.slice(2);
+const [url, dir, P = 's7'] = process.argv.slice(2);
 const HOST = '192.168.1.66';
 const fail = (msg) => { console.error(`SHOTS FAIL: ${msg}`); process.exit(1); };
 const api = async (path) => (await fetch(`${url}/api/v1${path}`)).json();
@@ -42,21 +43,29 @@ try {
     return (+(t.match(/(\d+)\s*records/) || [])[1] >= 5) && parseFloat(document.querySelector('[data-testid="kpi-fps"] .kpi')?.textContent) > 0;
   }, null, { timeout: 400000, polling: 500 }).catch(() => fail('KPI strip never showed a live rate with >= 5 verified records'));
   await s.waitForTimeout(1200);
-  await s.locator('[data-testid="kpi-strip"]').screenshot({ path: `${dir}/s6-06-kpi-strip.png` });
+  await s.locator('[data-testid="kpi-strip"]').screenshot({ path: `${dir}/${P}-06-kpi-strip.png` });
   await s.close();
 
   // 1: the flood's spark lands on tile (a): all four campaigns are in
-  await p.waitForFunction(() => +document.querySelector('[data-testid="tile-a"]').dataset.pulses > 0, null, { timeout: 400000, polling: 100 })
-    .catch(() => fail('tile (a) never pulsed'));
-  await p.waitForTimeout(250);
+  // 0: the fast lane's provisional flood alert, outlined on tile (a) until the flow lane confirms it
+  await p.waitForFunction(() => document.querySelector('[data-testid="tile-a-latest"]')?.dataset.provisional === 'true',
+    null, { timeout: 400000, polling: 50 }).catch(() => fail('no provisional flood alert on tile (a)'));
+  await p.screenshot({ path: `${dir}/${P}-00-flood-provisional.png` });
+  await p.waitForFunction(() => /fast lane flagged it/.test(document.querySelector('[data-testid="tile-a-latest"]')?.textContent || ''),
+    null, { timeout: 60000, polling: 100 }).catch(() => fail('the provisional flood alert was not confirmed'));
+  // the confirming alert's spark has landed on tile (a) (its second pulse)
+  await p.waitForFunction(() => +document.querySelector('[data-testid="tile-a"]').dataset.pulses > 1, null, { timeout: 400000, polling: 100 })
+    .catch(() => fail('the confirming flood alert never landed on tile (a)'));
+  await p.waitForFunction(() => document.querySelectorAll('[data-testid="campaign-list"] > li').length === 4, null, { timeout: 5000, polling: 100 })
+    .catch(() => {});  // the ribbon refreshes 800 ms after an alert; checked below
   const n = (await api('/campaigns')).count;
   if (n !== 4) fail(`${n} campaigns, expected 4`);
   const ribbon = await p.locator('[data-testid="campaign-list"] > li').count();
   if (ribbon !== 4) fail(`ribbon shows ${ribbon} campaigns`);
   if (!/Bytes sent back\s*0/.test(await p.getByTestId('bytes-back').innerText())) fail('no "Bytes sent back 0"');
   for (const t of ['a', 'b', 'c', 'd', 'e', 'f']) if (!(await p.getByTestId(`tile-${t}-latest`).count())) fail(`tile ${t} has no latest alert`);
-  await p.screenshot({ path: `${dir}/s6-01-hero-tiles-kpi.png` });
-  console.log('s6-01 at pipeline state', (await api('/metrics')).pipeline_state);
+  await p.screenshot({ path: `${dir}/${P}-01-hero-tiles-kpi.png` });
+  console.log(`${P}-01 at pipeline state`, (await api('/metrics')).pipeline_state);
 
   // 2: the campaign map, all four campaigns, no label overlap
   await p.locator('#map').evaluate((e) => e.scrollIntoView());
@@ -70,7 +79,7 @@ try {
     return { clusters: document.querySelectorAll('[data-testid="campaign-map"] [data-campaign]').length, hit };
   });
   if (map.clusters !== 4 || map.hit) fail(`map: ${JSON.stringify(map)}`);
-  await p.screenshot({ path: `${dir}/s6-02-campaign-map.png` });
+  await p.screenshot({ path: `${dir}/${P}-02-campaign-map.png` });
 
   // 3: the host's stage timeline
   await p.locator(`[data-ip="${HOST}"][data-host]`).click();
@@ -79,7 +88,7 @@ try {
   const stages = await p.locator('[data-testid="host-timeline"] [data-stage]').evaluateAll((e) => [...new Set(e.map((x) => x.dataset.stage))]);
   if (stages.join('|') !== 'Discovery|Command and Control|Exfiltration') fail(`stages: ${stages}`);
   await p.locator('#map').evaluate((e) => e.scrollIntoView());
-  await p.screenshot({ path: `${dir}/s6-03-stage-timeline-${HOST}.png` });
+  await p.screenshot({ path: `${dir}/${P}-03-stage-timeline-${HOST}.png` });
   await p.getByLabel('Close timeline').click();
   await p.waitForTimeout(1200);
 
@@ -92,7 +101,7 @@ try {
   await p.waitForTimeout(1200);
   const fits = await p.evaluate(() => { const d = document.querySelector('[data-testid="alert-drawer"] .overflow-y-auto'); return d.scrollHeight <= d.clientHeight + 1; });
   if (!fits) fail('case file does not fit the frame');
-  await p.screenshot({ path: `${dir}/s6-04-exfil-case-file.png` });
+  await p.screenshot({ path: `${dir}/${P}-04-exfil-case-file.png` });
   await p.getByLabel('Close alert').click();
 
   // 5: the model card
@@ -100,7 +109,7 @@ try {
   await p.getByTestId('model-card-button').click();
   await p.waitForSelector('[data-testid="model-card"]');
   await p.waitForTimeout(900);
-  await p.screenshot({ path: `${dir}/s6-05-model-card.png` });
+  await p.screenshot({ path: `${dir}/${P}-05-model-card.png` });
 } finally {
   await b.close();
 }

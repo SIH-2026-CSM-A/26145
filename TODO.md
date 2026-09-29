@@ -3,8 +3,12 @@
 IDs in brackets refer to docs/AUDIT.md.
 
 ## Now
-- [ ] Redeploy the VM (`saakshi-demo`, boots from the `saakshi-ref` metadata ref) at tag
-      `idea-deck-v3-ui` for the session-6 dashboard. Owner does this.
+- [ ] Redeploy the VM (`saakshi-demo`) at tag `idea-deck-v4` (fast lane, signed bundle). Owner does this.
+- [ ] Exfil egress-baseline substitute is noisy on outbound-only captures: 91 HIGH alerts on 3 CTU
+      normal hosts in 11 min (docs/ONEWAY.md). It has no entity dedupe; consider a per-host dedupe
+      and a higher z on one-sided links. Re-run rule_eval + ONEWAY after any change.
+- [ ] Reflection rule counts genuine answers when only inbound halves are captured
+      (busy_resolver IN, docs/ONEWAY.md). Needs a signal that does not depend on the query half.
 - [ ] C2 is still the noisiest rule on real traffic: about 97 alerts per 10k flows on held-out
       s12, 97% on unlabelled hosts (docs/RULES.md §4). The 90%-of-TP floor binds because CTU TPs
       are host-based. The next lever is not a threshold but a feature (e.g. a long-horizon
@@ -21,6 +25,13 @@ IDs in brackets refer to docs/AUDIT.md.
       read store views once per flow.
 
 ## Next
+- [ ] Sensor health NORMAL / DEGRADED / BLIND (session-7 P5, cut, not started): queue/parser
+      drops, capture gaps, one-sided share, rate collapse -> OBSERVABILITY_DEGRADED + degraded=true.
+- [ ] Signed chain checkpoints (session-7 P6, cut, not started): reuse bundle.py's Ed25519;
+      verify-log checks them; export carries checkpoints + public key.
+- [ ] Fast lane: no shared-infrastructure suppression; a scanner inside a >65k-source/s spoofed
+      flood is not tracked (FastLane.overflow). Drops beyond the ceiling are modelled only: needs a
+      real capture ring (AF_PACKET) to measure.
 - [ ] Zeek adapter behind `FlowSource` (conn/dns/ssl logs + IAT script); dpkt stays fallback.
       Map `resp_pkts > 0` -> reverse_seen and `history` -> observability_state.
 - [ ] Keep DNS qtype on FlowRecord so a TXT/NULL ratio can be declared and computed [A4].

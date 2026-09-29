@@ -1,5 +1,99 @@
 # Session Log
 
+## 2026-09-28/29 — Claude Code (Opus 5.5) — session 7: gaps reviewers hit, measured; film v2
+
+**Agent:** Claude Code (Anthropic, model Opus 5.5). Branch `main`, starting at `6de6a3d` (240 tests).
+No other agent worked on this repo. Tags `idea-deck-v3` / `idea-deck-v3-ui` untouched.
+
+### Owner decisions
+- Plan approved as shown. The deviations are: capped exact sets instead of HLL in the fast lane
+  (a blake2b hash per packet costs about the whole 5% budget), and `ruleset.json` generated from
+  the code and checked against it (thresholds stay in `detectors.py`).
+- Mid-session: **P5 (sensor health) and P6 (signed chain checkpoints) cut, not started.** Part F
+  (film v2) was added instead.
+
+### Shipped (commits in order)
+1. `7393fe7 perf:` s12 on a temporary GCP `e2-standard-4`:
+   - hardware and software: Xeon @ 2.20 GHz Broadwell, Ubuntu 24.04.5, kernel 7.0.0-1011-gcp,
+     Python 3.13.15;
+   - result: **345.1 flows/s** mean (340.1 / 345.7 / 349.4, repeat 335.5), 89.5 Mbps, 13,618 pps,
+     821.2 B/packet, same 91 alerts;
+   - the VM and its disk were deleted and the deletion confirmed. `libgomp1` had to be installed
+     for LightGBM.
+2. `000b047 docs:`
+   - `docs/examples/` (as the API returned them); `EXPORT.md`; `ISOLATION.md`;
+   - `test_no_outbound_socket.py` (a replay under an audit hook, with a falsification test);
+   - MODELS §4.1a: the "28%" is 8,922 / 31,665 flows, with counts printed by
+     `scripts/recall_counts.py`, and the 27.6% base rate named apart.
+3. `3939d22 feat(fastlane):` 1-s packet counters raise provisional (a)/(e) alerts; the flow lane
+   confirms them (`confirms`).
+   - Aggregate alerts carry a window `flow_id` plus `contributing_flows`. Contract 1.4.0.
+   - Dashboard: the provisional alert is drawn outlined.
+   - `spoofed_flood` capture added.
+4. `e9d7792 test(oneway):` `scripts/oneway.py` and `docs/ONEWAY.md`, as measured.
+5. `a99e542 feat(update):` signed offline bundles (`saakshi bundle keygen|build|sign|verify`,
+   Ed25519).
+   - The pipeline verifies the signature, then every hash, then that the code matches the
+     bundle, before any deserialisation.
+   - The IsolationForest is now **skops** (joblib gone from the load path), with identical scores
+     and reproducible bytes.
+   - The private key is at `~/.config/saakshi/bundle-ed25519.pem`.
+6. `3f20d3f feat(demo): film v2`:
+   - new scenes and the v2 script, with 4 of the owner's lines reworded to stay true (listed in
+     `demo/film/script.md`);
+   - dashboard fix: a tile no longer drops back to "watching" while a confirming alert's spark is
+     in flight.
+7. `docs:` this entry, TODO, the stills script (`s7-*` names, waits for the confirmation).
+
+### Measurements (all in docs/BENCHMARK.md unless noted)
+- **Fast lane, packet → alert at 1×** (20 runs each), p50 / p99, fast lane vs flow lane:
+
+  | Capture | Fast lane | Flow lane |
+  |---|---|---|
+  | SYN flood | 1,526 / 1,983 ms | 20.1 s |
+  | Spoofed flood | 528 / 995 ms | 15.2 s |
+  | UDP reflection | 1,028 / 1,495 ms | 25.4 s |
+  | Scan | 1,002 / 1,499 ms | 16.1 s |
+- **Parser + fast lane ceiling** (64-B SYNs): 107,959 pps with random sources, 115,982 with
+  1,000 sources; the parser alone does 122,696 / 128,642. Modelled 16,384-slot ring drops:
+  0.10% / 0.95% at 1.0×, 32.6% / 33.7% at 1.5×.
+- **s12 with the fast lane:** 856.8 / 857.4 flows/s. **Exit re-run:** 851.8 flows/s, 220.8 Mbps,
+  −0.9% vs 859.5, 91 alerts (`26145-data/bench/s7-exit/`).
+- **One-way (docs/ONEWAY.md):**
+  - every demo attack whose packets are in a variant is caught there; (c) and (e) never cross
+    the boundary in the demo;
+  - 1 false alarm in 24 benign runs (reflection rule on `busy_resolver` IN);
+  - 91 egress-baseline exfil alerts on 3 CTU normal hosts in demo OUT.
+- **Film v2:** 5:13.7, −16.4 LUFS, 65 cues, worst onset 94 ms.
+
+### Found along the way
+- skops output is not reproducible as written:
+  - member names and `__id__`s are memory addresses;
+  - sklearn tree node arrays carry 7 uninitialised padding bytes.
+
+  `models/anomaly.dump_skops` renumbers the ids and zeroes the padding.
+- `git rm` chained after a failed heredoc still ran and deleted `iforest.joblib`. It was
+  restored from HEAD before the conversion.
+- The auto-mode permission checker failed 7 times in a row mid-P4 (a transient fault). Work
+  stopped and resumed on the owner's "continue".
+- At 5× the demo's flood confirmation arrives 3.9 s (wall) after the provisional alert, so the
+  film shows it without a cut.
+
+### Verification
+- `uv run pytest -q`: 264 passed. `npm run build` passes; `scripts/smoke.sh` passes, including
+  the check that a provisional alert is outlined and then confirmed.
+- Docker image rebuilt. `docker run --network none … analyze demo.pcap` gives 12 alerts, and
+  `saakshi bundle verify` passes inside the image.
+- Stills `s7-00` (the flood's provisional alert, outlined) to `s7-06` are in the assets folder,
+  next to the kept `s6-*`.
+- The 12 benign captures raise 0 alerts, and every attack capture fires its own detector,
+  after every part.
+
+### Not done / next
+- P5 sensor health (NORMAL / DEGRADED / BLIND) and P6 signed chain checkpoints: cut, not started.
+- VM redeploy of `saakshi-demo` at `idea-deck-v4` (owner). The live demo still runs session-6
+  code.
+
 ## 2026-09-27 — Claude Code (Opus 5.5) — session 6: a dashboard judges remember, and a narrated film
 
 **Agent:** Claude Code (Anthropic, model Opus 5.5). Branch `main`, starting at `977301e` (236 tests).
