@@ -1,5 +1,75 @@
 # Session Log
 
+## 2026-09-29 — Claude Code (Opus 5.5) — session 8: three measurements for the deck
+
+**Agent:** Claude Code (Anthropic, model Opus 5.5). Branch `main`, starting at `eab07af` (264 tests).
+No other agent worked on this repo. No detection, flow, feature, model or storage code changed.
+Tags `idea-deck-v3`, `idea-deck-v3-ui` and `idea-deck-v4` are untouched.
+
+### Owner decisions
+- Suricata gets an exact row and a matched-`HOME_NET` row. The owner quit Docker before each Part A
+  series. The PDF report (Part D step 1) was skipped because it is not final.
+- Part A: a host-pair split was added (N=4 and 8) next to the 5-tuple split.
+- Mid-session, on findings raised by the agent:
+  - Part A was re-run after the Suricata systemd service was found sniffing during series 1;
+    series 1 is kept below the headline;
+  - a stream-valid copy of the demo is the main Suricata comparison, and the as-is run is kept as
+    the second table.
+
+### Shipped (commits in order)
+1. `10116c1 bench: shard scaling` and `b127117` (re-run): `scripts/shard_scale.py`,
+   `benchmark.py --alerts-out`, docs/BENCHMARK.md "Multi-core scaling".
+   - Series 2, 5-tuple split, median of 3:
+     | N | flows/s | Mbps | efficiency |
+     |---|---|---|---|
+     | 1 | 819.0 | 212.3 | 1.00 |
+     | 2 | 1,412.5 | 366.2 | 0.86 |
+     | 4 | 2,425.8 | 628.8 | 0.74 |
+     | 8 | 3,915.4 | 1,015.0 | 0.60 |
+   - Host-pair split: N=4 2,507.6 flows/s (0.77), N=8 3,798.7 flows/s (0.58).
+   - Alert union ≠ 91 in every sharded configuration. The 5-tuple unions are 79 / 77 / 73. The
+     host-pair unions are 81 / 90, but only 70 alerts share a key with the single process. The
+     losses are mostly LightGBM, which reads host- and dst-tier state; per-rule reasons are in the
+     doc.
+2. `177ddae bench: suricata baseline`: `scripts/baseline.py`, docs/BASELINE.md. Suricata 8.0.3
+   with default ET Open (53,015 rules, untuned) raised **0 ET Open alerts** on every capture and
+   in both rows. SAAKSHI caught 7/7 attacks with both directions (12 alerts, 3 on background hosts)
+   and 3/3 possible outbound-only (100 alerts, 94 on background hosts). Zeek was not run: it was not
+   installed within its 20-minute limit.
+3. `3cc7ac1 test: one-way acceptance evidence`: docs/ONEWAY-ACCEPTANCE.md.
+   - The `unshare -rn` run gave the same 12 alerts; the sorted content digest is equal across 2
+     normal runs and the no-network run.
+   - strace: 0 socket/connect/bind; 61 one-byte `sendto` + 122 `recvfrom` on asyncio's AF_UNIX
+     self-pipe, attributed call by call.
+
+### Verification
+- `uv run pytest -q`: **264 passed** (2 third-party deprecation warnings, as before).
+- The shards add up exactly to the packets and wire bytes of s12. The N=1 shard is
+  record-identical to the capture, and N=1 gives the known 91 alerts.
+- `verify-log` passes on every Part C database.
+
+### Found (reported, not fixed)
+- **The generator writes every TCP packet with `seq=1000, ack=2000`** (`utils/pcap_generator.py`).
+  A stream-reassembling IDS rejects these sessions. SAAKSHI is unaffected: its alerts on the
+  stream-valid copy have identical content. The synthetic payloads are also simplified: the HTTP
+  has no Host header, and the TLS app-data records have a bad length.
+- **The alert storage order is not deterministic.** The provisional fast-lane alert races the flow
+  lane, so the record hashes and chain order differ between runs of the same capture; `alert_id` is
+  uuid4 in any case. The content is identical.
+- `apt install suricata` enables and starts a live `suricata.service`. It is now disabled on this
+  machine.
+- Shared-nothing sharding does not reproduce single-process detections for host- and dst-tier
+  rules or the model (docs/BENCHMARK.md).
+
+### Incomplete / next
+- Zeek baseline (`zeek-lts` 8.0.10 is available for xUbuntu 26.04 from OBS).
+- Sharding by internal host, or a shared store, if multi-core detection must equal single-process
+  detection.
+- A stream-valid generator: fix seq/ack at the source. It would change `demo.pcap` and its pinned
+  sha256.
+
+---
+
 ## 2026-09-28/29 — Claude Code (Opus 5.5) — session 7: gaps reviewers hit, measured; film v2
 
 **Agent:** Claude Code (Anthropic, model Opus 5.5). Branch `main`, starting at `6de6a3d` (240 tests).

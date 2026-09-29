@@ -25,6 +25,15 @@ IDs in brackets refer to docs/AUDIT.md.
       read store views once per flow.
 
 ## Next
+- [ ] Multi-core: shared-nothing shards scale throughput (3,915 flows/s on 8 vCPUs) but change the
+      alerts: host- and dst-tier state is split (docs/BENCHMARK.md "Multi-core scaling"). Hash by
+      internal host, or share the FeatureStore windows, then re-run `scripts/shard_scale.py`.
+- [ ] Generator writes fixed TCP seq/ack (1000/2000), so stream-reassembling tools reject the
+      demo's TCP sessions (docs/BASELINE.md). Fix in `utils/pcap_generator.py`; it changes demo.pcap
+      (rebuild + update the sha256 in its 3 places) and re-run baseline.py.
+- [ ] Zeek baseline on the same captures (`zeek-lts` from OBS xUbuntu_26.04), add to BASELINE.md.
+- [ ] Alert storage order depends on fast-lane / flow-lane scheduling (docs/ONEWAY-ACCEPTANCE.md);
+      decide whether the chain order should be made deterministic (e.g. publish in event time).
 - [ ] Sensor health NORMAL / DEGRADED / BLIND (session-7 P5, cut, not started): queue/parser
       drops, capture gaps, one-sided share, rate collapse -> OBSERVABILITY_DEGRADED + degraded=true.
 - [ ] Signed chain checkpoints (session-7 P6, cut, not started): reuse bundle.py's Ed25519;
