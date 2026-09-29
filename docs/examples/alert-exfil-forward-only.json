@@ -1,0 +1,99 @@
+{
+    "$schema": "https://sih26145.ntro.gov.in/schemas/alert.v2.json",
+    "version": "2.0",
+    "alert_id": "urn:uuid:0d4f9d49-4691-4b7c-b396-ec66ca3c2cf5",
+    "timestamp": "2026-09-21T14:23:21.997499+00:00",
+    "flow_id": "1:VUddkqzJtFaTnmbGkMUmAlWNjsg=",
+    "threat_class": "THREAT_EXFILTRATION",
+    "confidence": 0.85,
+    "severity": "HIGH",
+    "evidence": [
+        {
+            "feature": "src_egress_bytes_z",
+            "value": 720.8770489297149,
+            "baseline": 0.0,
+            "baseline_source": "host_ewma"
+        },
+        {
+            "feature": "dst_distinct_srcs_longterm",
+            "value": 1.0019582262108966,
+            "baseline": null,
+            "baseline_source": null
+        },
+        {
+            "feature": "off_hours",
+            "value": true,
+            "baseline": null,
+            "baseline_source": null
+        },
+        {
+            "feature": "egress_bytes",
+            "value": 1211200,
+            "baseline": null,
+            "baseline_source": null
+        }
+    ],
+    "observability_state": "forward_only",
+    "substitutions": [
+        {
+            "unavailable_on_this_flow": "outbound_inbound_byte_ratio",
+            "reason": "reverse direction not observed on this flow (forward_only)",
+            "substituted_by": [
+                "src_egress_bytes_z",
+                "dst_distinct_srcs_longterm",
+                "off_hours"
+            ]
+        }
+    ],
+    "contract_version": "1.4.0",
+    "model_version": "rules-2.1.0",
+    "campaign_id": "camp-ee0de4fb7d3b",
+    "host_stage": "TA0010",
+    "record_hash": "56e30baa8b3bef29e0cfc66efb648cbae301236e81401d243502dbcd4f57a260",
+    "provisional": false,
+    "confirms": null,
+    "contributing_flows": null,
+    "detector": {
+        "name": "exfiltration_detector",
+        "type": "RULE",
+        "version": "2.1.0"
+    },
+    "detection": {
+        "rule_matches": [
+            "RULE_EXFIL_EGRESS_BASELINE"
+        ],
+        "ml_scores": [],
+        "metrics": {
+            "src_egress_bytes_z": 720.8770489297149,
+            "dst_distinct_srcs_longterm": 1.0019582262108966,
+            "off_hours": true,
+            "egress_bytes": 1211200
+        },
+        "correlation": {
+            "campaign_id": "camp-ee0de4fb7d3b",
+            "host": "192.168.1.66",
+            "tactic": "Exfiltration",
+            "joined_on": [
+                "host:192.168.1.66",
+                "port:TCP/1"
+            ],
+            "not_merged": [],
+            "refused_pivots": []
+        }
+    },
+    "flow": {
+        "src_ip": "192.168.1.66",
+        "dst_ip": "203.0.113.99",
+        "dst_port": 443,
+        "protocol": "TCP",
+        "window_start": "2026-09-21T14:23:20+00:00",
+        "window_end": "2026-09-21T14:23:21.997499+00:00",
+        "src_port": 51515
+    },
+    "feature_summary": {
+        "total_packets": 800,
+        "total_bytes": 1211200,
+        "pps": 400.5,
+        "bps": 606358.25
+    }
+}
