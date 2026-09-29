@@ -246,7 +246,8 @@ a receive-only packet broker does the split, using a symmetric hash so that both
 flow land in the same shard. Here `scripts/shard_scale.py` does that split once, beforehand, and
 the split is **not timed**. Then N copies of the same unthrottled `scripts/benchmark.py` path run at
 once, each pinned with `taskset` to its own vCPU, one shard each. Data: `26145-data/bench/s8-shard/`
-(per-shard JSON, per-shard alert lists, `report.json`, `calibrate.json`, `lscpu*.txt`, `run.log`).
+(per-shard JSON, per-shard alert lists, `report.json`, `calibrate.json`, `lscpu*.txt`, `run.log`;
+the first series is in `series1-suricata-service-running/`).
 
 **Capture:** CTU-13 s12, as above (352,266 packets, 289,266,098 wire bytes, 8,927 flows).
 
@@ -264,7 +265,12 @@ record-for-record identical to the original capture.
   efficiency cores (1 thread each) = 10 physical cores, 16 threads.
 - On AC power, Windows best-performance mode.
 - Docker Desktop quit, no browser video.
-- 1-minute load 0.27 before the series started.
+- The Suricata systemd service installed for `docs/BASELINE.md` stopped (`systemctl is-active
+  suricata` = inactive).
+- 1-minute load 0.11 before the series started (16:10 UTC).
+
+The series was run twice. **Series 2 is the headline below.** Series 1, run earlier the same day, is
+kept at the end of this section: the Suricata service was still sniffing the WSL interface then.
 
 **What WSL2 lets us pin, and what it does not.** WSL2 shows Hyper-V's virtual topology, not the
 chip's: 8 cores × 2 threads, with no core type and no max frequency. `lscpu -e` inside WSL gives:
@@ -303,36 +309,40 @@ it. Each shard was pinned to one vCPU per virtual core, never two siblings:
 **Whether a shard ran on a P-core or an E-core was not controlled, and cannot be named from
 inside WSL.** A calibration ran the same pure-Python loop pinned to each of the 16 vCPUs in turn,
 3 passes, with the rest of the machine idle (`shard_scale.py calibrate`):
-- every vCPU had a median of 0.318–0.329 s;
-- one outlier pass took 0.42 s on vCPU 7.
+- series 2: every vCPU had a median of 0.315–0.322 s, and the slowest single pass took 0.334 s;
+- series 1: medians 0.318–0.329 s, with one outlier pass of 0.42 s on vCPU 7.
 
 So when a single thread runs alone, no vCPU is consistently slower, and Windows gives it a fast
 core. That says nothing about placement when 8 run at once: 8 busy threads cannot all sit on the 6
 P-cores.
 
-### Result: 5-tuple split (the throughput table)
+### Result: 5-tuple split (the throughput table, series 2)
 
 Median of 3 runs per N. Every run is listed; none was dropped.
 - **Flows/s** = Σ flows ÷ the wall time of the slowest shard.
 - **Mbps** = Σ wire bytes × 8 ÷ the same wall.
-- **Efficiency** = flows/s ÷ (N × the N=1 median, 816.0 flows/s).
+- **Efficiency** = flows/s ÷ (N × the N=1 median, 819.0 flows/s).
 - **Wall** is `benchmark.py`'s pipeline wall: model load and the capture-facts pass are outside it.
 - **Load** is the 1-minute load average from `uptime` just before each run. It includes the tail of
   the previous batch, which ended 5 s earlier.
 
 | N | vCPUs | Flows | Slowest shard wall | **Flows/s** | **Mbps** | **Efficiency** | Flows/s per run | Alerts (sum of shards) | Load before each run |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | 0 | 8,927 | 10.94 s | **816.0** | **211.5** | **1.00** | 772.9 / 822.0 / 816.0 | 91 / 91 / 91 | 0.61 / 1.69 / 1.72 |
-| 2 | 0,2 | 8,927 | 5.75 s | **1,552.5** | **402.5** | **0.95** | 1,487.8 / 1,555.2 / 1,552.5 | 79 / 79 / 79 | 0.83 / 1.45 / 1.48 |
-| 4 | 0,2,4,6 | 8,927 | 3.96 s | **2,254.3** | **584.4** | **0.69** | 2,254.3 / 2,466.0 / 2,248.6 | 77 / 77 / 77 | 0.93 / 1.42 / 1.44 |
-| 8 | 0,2,…,14 | 8,927 | 2.29 s | **3,898.3** | **1,010.5** | **0.60** | 3,673.7 / 3,915.4 / 3,898.3 | 73 / 73 / 73 | 1.08 / 1.35 / 1.51 |
+| 1 | 0 | 8,927 | 10.90 s | **819.0** | **212.3** | **1.00** | 809.3 / 819.0 / 819.7 | 91 / 91 / 91 | 0.61 / 1.32 / 2.18 |
+| 2 | 0,2 | 8,927 | 6.32 s | **1,412.5** | **366.2** | **0.86** | 1,412.5 / 1,588.4 / 1,346.5 | 79 / 79 / 79 | 0.62 / 1.53 / 1.84 |
+| 4 | 0,2,4,6 | 8,927 | 3.68 s | **2,425.8** | **628.8** | **0.74** | 2,425.8 / 2,445.8 / 2,330.8 | 77 / 77 / 77 | 0.77 / 1.44 / 1.71 |
+| 8 | 0,2,…,14 | 8,927 | 2.28 s | **3,915.4** | **1,015.0** | **0.60** | 3,599.6 / 3,967.6 / 3,915.4 | 73 / 73 / 73 | 1.09 / 1.51 / 1.60 |
 
 No run dropped a flow, since all runs were unthrottled with lossless backpressure.
 
-**N=1 is 816.0 flows/s, 5.1% under the session-5 mean of 859.5.** Two things differ from session
+**N=2 varies the most:** 1,346.5–1,588.4 flows/s, with both shards slower in run 3 (6.63 s and
+6.20 s). Series 1 measured N=2 at 1,552.5 (efficiency 0.95). Both are reported; the cause of the
+spread was not isolated.
+
+**N=1 is 819.0 flows/s, 4.7% under the session-5 mean of 859.5.** Two things differ from session
 5, and neither was isolated:
 - this run is pinned to one vCPU, so the aiosqlite writer thread shares that vCPU;
-- it records every alert (`--alerts-out`). The first run was the slowest of the three, as in session 5.
+- it records every alert (`--alerts-out`).
 
 ### Why efficiency falls with N
 
@@ -342,18 +352,18 @@ Efficiency splits into two measured factors (medians over the 3 runs):
 
 Efficiency is roughly their product.
 
-| N (5-tuple) | Balance | Per-core rate | Flows per shard (run 3) |
+| N (5-tuple) | Balance | Per-core rate | Flows per shard (same every run) |
 |---|---|---|---|
-| 2 | 0.97 | 0.98 | 4,701 / 4,226 |
-| 4 | 0.85 | 0.81 | 2,313 / 2,150 / 2,388 / 2,076 |
-| 8 | 0.81 | 0.72 | 1,227 / 1,067 / 1,095 / 1,100 / 1,086 / 1,083 / 1,293 / 976 |
+| 2 | 0.97 | 0.89 | 4,701 / 4,226 |
+| 4 | 0.87 | 0.84 | 2,313 / 2,150 / 2,388 / 2,076 |
+| 8 | 0.81 | 0.73 | 1,227 / 1,067 / 1,095 / 1,100 / 1,086 / 1,083 / 1,293 / 976 |
 
 - **Balance:** a hash split of one 8,927-flow capture is uneven: at N=8 the busiest shard carries
   66,604 packets and the lightest 21,775. The slowest shard sets the wall time. A longer capture or
   a live link, with many more flows, evens this out; a single elephant flow does not, because it
   cannot be split.
 - **Per-core rate:** each shard runs slower when others run at the same time. At N=4 and N=8 each
-  process does its work at 81% and 72% of the lone-core rate. The candidates are:
+  process does its work at 84% and 73% of the lone-core rate. The candidates are:
   - shared L3 and memory bandwidth;
   - a lower all-core turbo;
   - at N=8, Windows placing some vCPUs on E-cores, since there are only 6 P-cores.
@@ -361,25 +371,25 @@ Efficiency is roughly their product.
   These were not separated: WSL gives no per-core frequency or core-type counters.
 
 **Including start-up.** The launch-to-last-exit wall includes Python imports, model loading and one
-read of the capture per process. It is 12.1–14.0 s at N=1 and 3.5–4.4 s at N=8, i.e. 2,050–2,540
+read of the capture per process. It is 12.0–13.1 s at N=1 and 3.5–3.9 s at N=8, i.e. 2,280–2,520
 flows/s at N=8. A deployed sensor loads models once, so the pipeline wall above is the figure to
 size from.
 
-### Host-pair split (N=4 and N=8)
+### Host-pair split (N=4 and N=8, series 2)
 
 | N | vCPUs | Flows | Slowest shard wall | Flows/s | Mbps | Efficiency | Flows/s per run | Alerts (sum) | Load before each run |
 |---|---|---|---|---|---|---|---|---|---|
-| 4 | 0,2,4,6 | 8,927 | 3.51 s | 2,543.3 | 659.3 | 0.78 | 2,656.8 / 2,493.6 / 2,543.3 | 81 / 81 / 81 | 1.50 / 1.24 / 1.72 |
-| 8 | 0,2,…,14 | 8,927 | 2.37 s | 3,766.7 | 976.4 | 0.58 | 3,570.8 / 3,766.7 / 3,967.6 | 90 / 90 / 90 | 1.65 / 1.34 / 1.60 |
+| 4 | 0,2,4,6 | 8,927 | 3.56 s | 2,507.6 | 650.0 | 0.77 | 2,664.8 / 2,466.0 / 2,507.6 | 81 / 81 / 81 | 1.44 / 1.87 / 1.47 |
+| 8 | 0,2,…,14 | 8,927 | 2.35 s | 3,798.7 | 984.7 | 0.58 | 3,881.3 / 3,798.7 / 3,782.6 | 90 / 90 / 90 | 1.44 / 1.88 / 1.54 |
 
-At N=4 the pair split balanced better (balance 0.92 against 0.85) and ran faster. At N=8 the two
-splits are within run-to-run spread.
+Balance 0.89 and 0.80, per-core rate 0.86 and 0.72. The pair split was 3% faster than the 5-tuple
+split at N=4 and 3% slower at N=8, both within run-to-run spread. Neither split is clearly faster.
 
 ### Alert-union check: do N shards raise the same alerts as one process?
 
 **No.** The single process raises 91 alerts on s12: 69 `RULE_C2_PERIODIC_FLOWS` and 22 LightGBM.
 Each alert is compared as the key (rule, Community ID `flow_id`, provisional). In every
-configuration, the union over the shards was identical in all 3 runs.
+configuration, the union over the shards was identical in all 3 runs of both series.
 
 | Split | N | Union | Same key as single | Lost vs single (by rule) | New vs single (by rule) |
 |---|---|---|---|---|---|
@@ -419,13 +429,36 @@ entity's flows:
   form different campaigns. That changes `campaign_id`, not which alerts fire, and is not in the
   key above.
 
-**What this means for a deployment.** Shared-nothing sharding scales throughput: 3,898 flows/s and
-1,011 Mbps on 8 vCPUs here, 4.8× one core. It does **not** reproduce the single-process detections
+**What this means for a deployment.** Shared-nothing sharding scales throughput: 3,915 flows/s and
+1,015 Mbps on 8 vCPUs here, 4.8× one core. It does **not** reproduce the single-process detections
 for the rules and model that read per-host or per-destination state. The broker would have to hash
 by internal host, keeping every flow of a host in one shard, and even then per-destination state
 (DDoS, the destination half of LightGBM) is split. The alternative is a shared store. Neither was
 built or measured this session. The single-process figures elsewhere in this file are the ones
 whose detections were validated (`docs/RULES.md`, `docs/MODELS.md`).
+
+### Series 1 (superseded, kept as measured)
+
+Same procedure, 14:43–14:47 UTC. Discovered afterwards: installing Suricata for `docs/BASELINE.md`
+had started its systemd service at 10:42 UTC, and it was sniffing the WSL interface during these
+timings. Over its 4 h 50 min lifetime it used 87 s of CPU, about 0.5% of one core on average. Its
+share during the timing window is unknown. The service was stopped and the whole series re-run
+(series 2 above). Docker was quit for both series. Efficiency here is relative to this series' N=1
+median, 816.0.
+
+| Split | N | Slowest shard wall | Flows/s | Mbps | Efficiency | Flows/s per run | Alerts | Load before each run |
+|---|---|---|---|---|---|---|---|---|
+| 5-tuple | 1 | 10.94 s | 816.0 | 211.5 | 1.00 | 772.9 / 822.0 / 816.0 | 91 / 91 / 91 | 0.61 / 1.69 / 1.72 |
+| 5-tuple | 2 | 5.75 s | 1,552.5 | 402.5 | 0.95 | 1,487.8 / 1,555.2 / 1,552.5 | 79 / 79 / 79 | 0.83 / 1.45 / 1.48 |
+| 5-tuple | 4 | 3.96 s | 2,254.3 | 584.4 | 0.69 | 2,254.3 / 2,466.0 / 2,248.6 | 77 / 77 / 77 | 0.93 / 1.42 / 1.44 |
+| 5-tuple | 8 | 2.29 s | 3,898.3 | 1,010.5 | 0.60 | 3,673.7 / 3,915.4 / 3,898.3 | 73 / 73 / 73 | 1.08 / 1.35 / 1.51 |
+| host-pair | 4 | 3.51 s | 2,543.3 | 659.3 | 0.78 | 2,656.8 / 2,493.6 / 2,543.3 | 81 / 81 / 81 | 1.50 / 1.24 / 1.72 |
+| host-pair | 8 | 2.37 s | 3,766.7 | 976.4 | 0.58 | 3,570.8 / 3,766.7 / 3,967.6 | 90 / 90 / 90 | 1.65 / 1.34 / 1.60 |
+
+The two series agree within 1.4% at N=1 and N=8 and for both host-pair rows. They differ at N=2,
+where series 1 (service running) is 9.9% higher (1,552.5 against 1,412.5), and at N=4, where series 2
+is 7.6% higher (2,425.8 against 2,254.3). The service's effect is not visible above the run-to-run
+spread. The alert unions are identical.
 
 ### Reproduce
 
