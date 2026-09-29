@@ -62,20 +62,35 @@ def pct(samples, scale=1000.0):
     return dict(zip(("p50", "p95", "p99"), np.round(np.percentile(np.array(samples) * scale, [50, 95, 99]), 2).tolist()))
 
 
-async def bench(path: str, speed, queue_max: int) -> dict:
+def _alert_key(a) -> dict:
+    rule = a.detection["rule_matches"][0] if a.detection.get("rule_matches") else a.detector["name"]
+    return {"class": a.threat_class, "rule": rule, "flow_id": a.flow_id, "src": a.flow.get("src_ip"),
+            "dst": a.flow.get("dst_ip"), "provisional": a.provisional}
+
+
+async def bench(path: str, speed, queue_max: int, alerts_out=None) -> dict:
     db = tempfile.NamedTemporaryFile(suffix=".db", delete=False).name
     pipeline = ThreatDetectionPipeline(db)
     await pipeline.init()
-    m, by_class = PipelineMetrics(queue_max), Counter()
+    m, by_class, keys = PipelineMetrics(queue_max), Counter(), []
+
+    def on_alert(a):
+        by_class.update([a.threat_class])
+        if alerts_out:
+            keys.append(_alert_key(a))
+
     start = time.perf_counter()
     try:
-        await run_stream(pipeline, path, speed=speed, metrics=m, on_alert=lambda a: by_class.update([a.threat_class]))
+        await run_stream(pipeline, path, speed=speed, metrics=m, on_alert=on_alert)
     finally:
         wall = time.perf_counter() - start
         await pipeline.storage.close()
         for suffix in ("", "-wal", "-shm"):
             if os.path.exists(db + suffix):
                 os.remove(db + suffix)
+    if alerts_out:
+        with open(alerts_out, "w") as fh:
+            fh.writelines(json.dumps(k) + "\n" for k in keys)
     return {
         "mode": f"paced {speed}x real time (drop when queue full)" if speed else "unthrottled (lossless backpressure)",
         "queue_max": queue_max, "wall_s": round(wall, 2),
@@ -94,13 +109,14 @@ def main():
     ap.add_argument("--queue-max", type=int, default=10_000)
     ap.add_argument("--profile", help="write cProfile stats here and print the top functions by own time")
     ap.add_argument("--json", help="write the result here")
+    ap.add_argument("--alerts-out", help="write one JSON line per alert (class, rule, flow_id, endpoints)")
     args = ap.parse_args()
 
     result = {"hardware": hardware(), "capture": capture_facts(args.pcap)}
     prof = cProfile.Profile() if args.profile else None
     if prof:
         prof.enable()
-    result["run"] = asyncio.run(bench(args.pcap, args.speed, args.queue_max))
+    result["run"] = asyncio.run(bench(args.pcap, args.speed, args.queue_max, args.alerts_out))
     if prof:
         prof.disable()
         prof.dump_stats(args.profile)

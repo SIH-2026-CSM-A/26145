@@ -238,6 +238,205 @@ The CTU-13 s12 unthrottled run with the fast lane in the producer gave **856.8 a
 difference is 0.3%, inside run-to-run spread. Measured alone, the fast lane costs 0.15 µs per s12
 packet (352,266 packets, 0.06 s).
 
+## Multi-core scaling (shared-nothing shards) (2026-09-29)
+
+**Question:** does it scale beyond one core? The pipeline is one single-threaded Python process. It
+scales out by running one independent process per core, each fed a share of the link. On a real link
+a receive-only packet broker does the split, using a symmetric hash so that both directions of a
+flow land in the same shard. Here `scripts/shard_scale.py` does that split once, beforehand, and
+the split is **not timed**. Then N copies of the same unthrottled `scripts/benchmark.py` path run at
+once, each pinned with `taskset` to its own vCPU, one shard each. Data: `26145-data/bench/s8-shard/`
+(per-shard JSON, per-shard alert lists, `report.json`, `calibrate.json`, `lscpu*.txt`, `run.log`).
+
+**Capture:** CTU-13 s12, as above (352,266 packets, 289,266,098 wire bytes, 8,927 flows).
+
+**Split:**
+- 5-tuple split: hash of the protocol and the sorted (src IP, port) / (dst IP, port) pair.
+- Host-pair split: protocol and sorted IP pair, no ports.
+- Shard = blake2b(key) mod N.
+- The 729 non-IP frames go to shard 0; s12 has no IP fragments.
+
+Every split's shards add up to the original packet and wire-byte totals exactly. The N=1 "shard" is
+record-for-record identical to the original capture.
+
+**Machine:**
+- Same laptop as above: Intel Core i5-13450HX, which is 6 performance cores (2 threads each) + 4
+  efficiency cores (1 thread each) = 10 physical cores, 16 threads.
+- On AC power, Windows best-performance mode.
+- Docker Desktop quit, no browser video.
+- 1-minute load 0.27 before the series started.
+
+**What WSL2 lets us pin, and what it does not.** WSL2 shows Hyper-V's virtual topology, not the
+chip's: 8 cores × 2 threads, with no core type and no max frequency. `lscpu -e` inside WSL gives:
+
+```
+CPU NODE SOCKET CORE L1d:L1i:L2:L3 ONLINE
+  0    0      0    0 0:0:0:0          yes
+  1    0      0    0 0:0:0:0          yes
+  2    0      0    1 1:1:1:0          yes
+  3    0      0    1 1:1:1:0          yes
+  4    0      0    2 2:2:2:0          yes
+  5    0      0    2 2:2:2:0          yes
+  6    0      0    3 3:3:3:0          yes
+  7    0      0    3 3:3:3:0          yes
+  8    0      0    4 4:4:4:0          yes
+  9    0      0    4 4:4:4:0          yes
+ 10    0      0    5 5:5:5:0          yes
+ 11    0      0    5 5:5:5:0          yes
+ 12    0      0    6 6:6:6:0          yes
+ 13    0      0    6 6:6:6:0          yes
+ 14    0      0    7 7:7:7:0          yes
+ 15    0      0    7 7:7:7:0          yes
+```
+
+That is 8 "cores" of 2 threads. The real chip is 6 two-thread P-cores + 4 one-thread E-cores, so a
+WSL core is **not** a physical core. Windows decides which host core runs each vCPU and can move
+it. Each shard was pinned to one vCPU per virtual core, never two siblings:
+
+| N | vCPUs used |
+|---|---|
+| 1 | 0 |
+| 2 | 0, 2 |
+| 4 | 0, 2, 4, 6 |
+| 8 | 0, 2, 4, 6, 8, 10, 12, 14 |
+
+**Whether a shard ran on a P-core or an E-core was not controlled, and cannot be named from
+inside WSL.** A calibration ran the same pure-Python loop pinned to each of the 16 vCPUs in turn,
+3 passes, with the rest of the machine idle (`shard_scale.py calibrate`):
+- every vCPU had a median of 0.318–0.329 s;
+- one outlier pass took 0.42 s on vCPU 7.
+
+So when a single thread runs alone, no vCPU is consistently slower, and Windows gives it a fast
+core. That says nothing about placement when 8 run at once: 8 busy threads cannot all sit on the 6
+P-cores.
+
+### Result: 5-tuple split (the throughput table)
+
+Median of 3 runs per N. Every run is listed; none was dropped.
+- **Flows/s** = Σ flows ÷ the wall time of the slowest shard.
+- **Mbps** = Σ wire bytes × 8 ÷ the same wall.
+- **Efficiency** = flows/s ÷ (N × the N=1 median, 816.0 flows/s).
+- **Wall** is `benchmark.py`'s pipeline wall: model load and the capture-facts pass are outside it.
+- **Load** is the 1-minute load average from `uptime` just before each run. It includes the tail of
+  the previous batch, which ended 5 s earlier.
+
+| N | vCPUs | Flows | Slowest shard wall | **Flows/s** | **Mbps** | **Efficiency** | Flows/s per run | Alerts (sum of shards) | Load before each run |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 0 | 8,927 | 10.94 s | **816.0** | **211.5** | **1.00** | 772.9 / 822.0 / 816.0 | 91 / 91 / 91 | 0.61 / 1.69 / 1.72 |
+| 2 | 0,2 | 8,927 | 5.75 s | **1,552.5** | **402.5** | **0.95** | 1,487.8 / 1,555.2 / 1,552.5 | 79 / 79 / 79 | 0.83 / 1.45 / 1.48 |
+| 4 | 0,2,4,6 | 8,927 | 3.96 s | **2,254.3** | **584.4** | **0.69** | 2,254.3 / 2,466.0 / 2,248.6 | 77 / 77 / 77 | 0.93 / 1.42 / 1.44 |
+| 8 | 0,2,…,14 | 8,927 | 2.29 s | **3,898.3** | **1,010.5** | **0.60** | 3,673.7 / 3,915.4 / 3,898.3 | 73 / 73 / 73 | 1.08 / 1.35 / 1.51 |
+
+No run dropped a flow, since all runs were unthrottled with lossless backpressure.
+
+**N=1 is 816.0 flows/s, 5.1% under the session-5 mean of 859.5.** Two things differ from session
+5, and neither was isolated:
+- this run is pinned to one vCPU, so the aiosqlite writer thread shares that vCPU;
+- it records every alert (`--alerts-out`). The first run was the slowest of the three, as in session 5.
+
+### Why efficiency falls with N
+
+Efficiency splits into two measured factors (medians over the 3 runs):
+- **Balance** = mean shard wall ÷ slowest shard wall.
+- **Per-core rate** = the N=1 wall ÷ the sum of shard walls.
+
+Efficiency is roughly their product.
+
+| N (5-tuple) | Balance | Per-core rate | Flows per shard (run 3) |
+|---|---|---|---|
+| 2 | 0.97 | 0.98 | 4,701 / 4,226 |
+| 4 | 0.85 | 0.81 | 2,313 / 2,150 / 2,388 / 2,076 |
+| 8 | 0.81 | 0.72 | 1,227 / 1,067 / 1,095 / 1,100 / 1,086 / 1,083 / 1,293 / 976 |
+
+- **Balance:** a hash split of one 8,927-flow capture is uneven: at N=8 the busiest shard carries
+  66,604 packets and the lightest 21,775. The slowest shard sets the wall time. A longer capture or
+  a live link, with many more flows, evens this out; a single elephant flow does not, because it
+  cannot be split.
+- **Per-core rate:** each shard runs slower when others run at the same time. At N=4 and N=8 each
+  process does its work at 81% and 72% of the lone-core rate. The candidates are:
+  - shared L3 and memory bandwidth;
+  - a lower all-core turbo;
+  - at N=8, Windows placing some vCPUs on E-cores, since there are only 6 P-cores.
+
+  These were not separated: WSL gives no per-core frequency or core-type counters.
+
+**Including start-up.** The launch-to-last-exit wall includes Python imports, model loading and one
+read of the capture per process. It is 12.1–14.0 s at N=1 and 3.5–4.4 s at N=8, i.e. 2,050–2,540
+flows/s at N=8. A deployed sensor loads models once, so the pipeline wall above is the figure to
+size from.
+
+### Host-pair split (N=4 and N=8)
+
+| N | vCPUs | Flows | Slowest shard wall | Flows/s | Mbps | Efficiency | Flows/s per run | Alerts (sum) | Load before each run |
+|---|---|---|---|---|---|---|---|---|---|
+| 4 | 0,2,4,6 | 8,927 | 3.51 s | 2,543.3 | 659.3 | 0.78 | 2,656.8 / 2,493.6 / 2,543.3 | 81 / 81 / 81 | 1.50 / 1.24 / 1.72 |
+| 8 | 0,2,…,14 | 8,927 | 2.37 s | 3,766.7 | 976.4 | 0.58 | 3,570.8 / 3,766.7 / 3,967.6 | 90 / 90 / 90 | 1.65 / 1.34 / 1.60 |
+
+At N=4 the pair split balanced better (balance 0.92 against 0.85) and ran faster. At N=8 the two
+splits are within run-to-run spread.
+
+### Alert-union check: do N shards raise the same alerts as one process?
+
+**No.** The single process raises 91 alerts on s12: 69 `RULE_C2_PERIODIC_FLOWS` and 22 LightGBM.
+Each alert is compared as the key (rule, Community ID `flow_id`, provisional). In every
+configuration, the union over the shards was identical in all 3 runs.
+
+| Split | N | Union | Same key as single | Lost vs single (by rule) | New vs single (by rule) |
+|---|---|---|---|---|---|
+| 5-tuple | 1 | 91 | 91 | — | — |
+| 5-tuple | 2 | 79 | 79 | 12 LightGBM | — |
+| 5-tuple | 4 | 77 | 73 | 18 LightGBM | 1 C2, 3 LightGBM |
+| 5-tuple | 8 | 73 | 69 | 22 LightGBM | 1 C2, 1 recon fan-out, 1 DDoS volume-baseline, 1 LightGBM |
+| host-pair | 4 | 81 | 70 | 21 LightGBM | 5 C2, 1 recon fan-out, 1 DDoS volume-baseline, 4 LightGBM |
+| host-pair | 8 | 90 | 70 | 21 LightGBM | 5 C2, 1 recon fan-out, 1 DDoS volume-baseline, 13 LightGBM |
+
+The host-pair split at N=8 has 90 alerts, close to 91 in count, but only 70 of them are the same
+alerts. The count is close by coincidence. **The host-pair split did not shrink the difference.**
+
+Why, per rule. Each rule's cross-flow reads are declared in `feature_contract.toml`, under the
+tiers flow, pair, host (per source) and dst (per destination). A shard sees only its share of each
+entity's flows:
+- **C2 beacon** reads pair-tier IAT statistics (`pair_iat_n/mean/cv`) and one host-tier count,
+  `src_periodic_dsts_w`.
+  - 5-tuple split: all 69 single-process C2 alerts survive. They sit on only 11 distinct 5-tuples,
+    the same connection repeated, so each one's repeats stay in one shard.
+  - Host-pair split: all pair-tier state is whole, so the only C2 input it changes is
+    `src_periodic_dsts_w`. A beaconing host's periodic destinations are spread over shards, each
+    shard counts fewer, and 5 alerts appear that the single process does not raise.
+- **LightGBM** reads 16 host- and dst-tier window features (distinct destinations, distinct ports
+  and SYN-only ratio per source; flows, bytes, sources, entropy and baselines per destination).
+  Neither split keeps a host's or a destination's traffic together, because one host talks to many
+  peers. The model's inputs change, and 12–22 of the 22 single-process LightGBM alerts are lost.
+  Some new ones appear elsewhere.
+- **Recon fan-out** reads per-source fan-out (`src_distinct_dsts_w`, `src_distinct_dst_ports_w`,
+  `src_syn_only_ratio_w`) and `dst_distinct_srcs_w`. Across shards, one scanner's flows are
+  counted separately. Here one alert appears that the single process does not raise. The most likely cause is
+  that the shared-destination suppression (`dst_distinct_srcs_w`) sees fewer sources per
+  destination in a shard; this was not traced alert by alert.
+- **DDoS volume-baseline** reads per-destination volume and its baseline, which a split divides
+  between shards. One new alert.
+- **Campaign correlator:** each shard has its own, so a host's stages that land in different shards
+  form different campaigns. That changes `campaign_id`, not which alerts fire, and is not in the
+  key above.
+
+**What this means for a deployment.** Shared-nothing sharding scales throughput: 3,898 flows/s and
+1,011 Mbps on 8 vCPUs here, 4.8× one core. It does **not** reproduce the single-process detections
+for the rules and model that read per-host or per-destination state. The broker would have to hash
+by internal host, keeping every flow of a host in one shard, and even then per-destination state
+(DDoS, the destination half of LightGBM) is split. The alternative is a shared store. Neither was
+built or measured this session. The single-process figures elsewhere in this file are the ones
+whose detections were validated (`docs/RULES.md`, `docs/MODELS.md`).
+
+### Reproduce
+
+```bash
+uv run python scripts/shard_scale.py split N [--by pair]      # N = 1 2 4 8 (pair: 4 8); not timed
+uv run python scripts/shard_scale.py calibrate                  # per-vCPU single-thread loop, 3 passes
+# idle machine; the series ran rep-major: for rep in 1 2 3: N=1,2,4,8 (5-tuple), then N=4,8 (pair), 5 s apart
+uv run python scripts/shard_scale.py run N REP [--by pair]      # N x taskset -c CPU .venv/bin/python scripts/benchmark.py SHARD --json .. --alerts-out ..
+uv run python scripts/shard_scale.py report                     # medians, efficiency, alert-union diff by rule
+```
+
 ## Profile: top five hot spots
 
 cProfile over the unthrottled scenario-12 run: 22.7 s under the profiler against about 10 s
